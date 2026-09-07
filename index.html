@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smoke Signals POS</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-logo-wrap">
+        <img class="sidebar-logo" src="assets/smoke-signals-color-logo.png" alt="Smoke Signals logo" />
+      </div>
+
+      <nav class="nav-list" aria-label="Primary">
+        <button class="nav-item active" type="button" data-module="sale"><span>🛒</span>New Sale</button>
+        <button class="nav-item" type="button"><span>📦</span>Inventory</button>
+        <button class="nav-item" type="button"><span>🧾</span>Purchase Orders</button>
+        <button class="nav-item" type="button"><span>📥</span>Receiving</button>
+        <button class="nav-item" type="button"><span>🏷️</span>Vendors</button>
+        <button class="nav-item" type="button"><span>💳</span>Transactions</button>
+        <button class="nav-item" type="button"><span>↩️</span>Returns</button>
+        <button class="nav-item" type="button"><span>👥</span>Customers</button>
+        <button class="nav-item" type="button"><span>📊</span>Reports</button>
+        <button class="nav-item" type="button"><span>🔐</span>Manager</button>
+        <button class="nav-item" type="button"><span>⚙️</span>Settings</button>
+      </nav>
+
+      <div class="employee-card">
+        <div class="employee-avatar">JS</div>
+        <div>
+          <strong>John Smith</strong>
+          <span>Manager</span>
+        </div>
+      </div>
+
+      <div class="sidebar-clock">
+        <strong id="clockTime">--:--</strong>
+        <span id="clockDate">--</span>
+      </div>
+
+      <button class="logout-btn" type="button">↪ Logout</button>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-header">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input id="productSearch" type="search" placeholder="Scan barcode or search products..." autocomplete="off" />
+          <button class="scan-btn" type="button" title="Barcode scanner ready">▣</button>
+        </div>
+      </header>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>POPULAR ITEMS</h2>
+          <span class="muted-note">Auto-ranked by recent sales</span>
+        </div>
+        <div id="popularGrid" class="product-grid popular-grid"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>CATEGORIES</h2>
+        </div>
+        <div id="categoryGrid" class="category-grid"></div>
+      </section>
+
+      <section id="categoryProductsSection" class="section-block hidden">
+        <div class="section-heading">
+          <h2 id="categoryProductsTitle">PRODUCTS</h2>
+          <button id="closeCategory" class="text-btn" type="button">Close</button>
+        </div>
+        <div id="categoryProductsGrid" class="product-grid"></div>
+      </section>
+    </main>
+
+    <aside class="transaction-panel">
+      <div class="transaction-brand">
+        <img src="assets/smoke-signals-words-logo.png" alt="Smoke Signals" />
+      </div>
+
+      <section class="customer-section">
+        <div class="customer-row">
+          <div class="field-stack customer-search-stack">
+            <label for="customerSearch">Customer</label>
+            <input id="customerSearch" type="search" placeholder="Search name, phone or email" autocomplete="off" />
+          </div>
+          <button id="newCustomerBtn" class="primary-btn compact" type="button">+ New Customer</button>
+        </div>
+        <div id="customerSearchResults" class="search-results hidden"></div>
+        <div id="selectedCustomerCard" class="selected-customer hidden"></div>
+      </section>
+
+      <div class="cart-header">
+        <span>Item</span>
+        <span>Qty</span>
+        <span>Total</span>
+        <span></span>
+      </div>
+
+      <div id="cartLines" class="cart-lines">
+        <div class="empty-cart">
+          <strong>No items yet</strong>
+          <span>Scan or tap a product to begin a sale.</span>
+        </div>
+      </div>
+
+      <button id="saleNoteBtn" class="secondary-btn add-note-btn" type="button">+ Add Note</button>
+
+      <section class="totals">
+        <div class="total-row"><span>Subtotal</span><strong id="subtotalValue">$0.00</strong></div>
+        <div id="transactionDiscountRow" class="total-row discount-row hidden"><span id="transactionDiscountLabel">Discount</span><strong id="transactionDiscountValue">-$0.00</strong></div>
+        <div class="total-row"><span>Tax (8.25%)</span><strong id="taxValue">$0.00</strong></div>
+        <div class="grand-total"><span>TOTAL</span><strong id="totalValue">$0.00</strong></div>
+      </section>
+
+      <div class="payment-grid">
+        <button id="cashBtn" class="pay-btn cash" type="button">💵 CASH</button>
+        <button id="cardBtn" class="pay-btn card" type="button">▣ CARD</button>
+      </div>
+
+      <div class="action-grid">
+        <button id="discountBtn" class="action-btn" type="button">🏷️<span>Discount</span></button>
+        <button id="holdBtn" class="action-btn" type="button">⏸<span>Hold Sale</span></button>
+        <button id="splitPaymentBtn" class="action-btn wide" type="button">⇄<span>Split Payment</span></button>
+        <button id="clearSaleBtn" class="action-btn danger wide" type="button">⊖<span>Clear Sale</span></button>
+      </div>
+    </aside>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden" role="presentation">
+    <section id="modalCard" class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></section>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
