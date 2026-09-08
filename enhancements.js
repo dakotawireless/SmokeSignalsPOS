@@ -26,6 +26,14 @@
     .inventory-table .delete-cell{text-align:center;width:42px}
     .inventory-table .delete-item-btn{border:0;background:transparent;color:#b72b2b;font-size:20px;line-height:1;padding:4px 7px;border-radius:6px}
     .inventory-table .delete-item-btn:hover{background:#fff0f0}
+    .inventory-table .select-cell{text-align:center;width:42px}
+    .inventory-table .row-select,.inventory-table .select-all{width:18px;height:18px;accent-color:var(--green);cursor:pointer}
+    .bulk-inventory-bar{display:flex;align-items:center;gap:8px;margin:10px 0;padding:9px 10px;background:#fff;border:1px solid var(--border);border-radius:10px}
+    .bulk-inventory-bar .bulk-count{font-size:12px;font-weight:800;color:var(--muted);margin-right:auto}
+    .bulk-inventory-bar button{border:1px solid var(--border);background:#fff;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:850}
+    .bulk-inventory-bar .bulk-archive-btn{color:#7b5a00}
+    .bulk-inventory-bar .bulk-delete-btn{color:var(--danger)}
+    .bulk-inventory-bar button:disabled{opacity:.45;cursor:not-allowed}
   `;
   document.head.appendChild(style);
 
@@ -50,12 +58,12 @@
   }
   function findBarcode(barcode){
     const b = String(barcode || "").trim();
-    return products().find(p => Array.isArray(p.barcodes) && p.barcodes.some(x => String(x) === b));
+    return products().find(p => !p.archived && Array.isArray(p.barcodes) && p.barcodes.some(x => String(x) === b));
   }
   function matches(query){
     const q = String(query || "").trim().toLowerCase();
     if (!q) return [];
-    return products().filter(p => {
+    return products().filter(p => !p.archived).filter(p => {
       const name = String(p.name || "").toLowerCase();
       const category = String(p.category || "").toLowerCase();
       const supplier = String(p.supplier || "").toLowerCase();
@@ -211,12 +219,87 @@
 
   const inventoryTable = document.querySelector(".inventory-table");
   const inventoryBody = document.getElementById("inventoryTableBody");
+  let selectedInventoryIds = new Set();
+
+  function ensureBulkInventoryBar(){
+    if (!inventoryTable || document.getElementById("bulkInventoryBar")) return;
+    const wrap = inventoryTable.closest(".inventory-table-wrap");
+    if (!wrap) return;
+    const bar = document.createElement("div");
+    bar.id = "bulkInventoryBar";
+    bar.className = "bulk-inventory-bar";
+    bar.innerHTML = `<span class="bulk-count" id="bulkInventoryCount">0 selected</span>
+      <button class="bulk-archive-btn" id="bulkArchiveBtn" type="button" disabled>Archive Selected</button>
+      <button class="bulk-delete-btn" id="bulkDeleteBtn" type="button" disabled>Delete Selected</button>`;
+    wrap.parentNode.insertBefore(bar, wrap);
+
+    document.getElementById("bulkArchiveBtn").addEventListener("click", bulkArchiveSelected);
+    document.getElementById("bulkDeleteBtn").addEventListener("click", bulkDeleteSelected);
+  }
+
+  function updateBulkInventoryBar(){
+    const count = selectedInventoryIds.size;
+    const label = document.getElementById("bulkInventoryCount");
+    const archiveBtn = document.getElementById("bulkArchiveBtn");
+    const deleteBtn = document.getElementById("bulkDeleteBtn");
+    if (label) label.textContent = `${count} selected`;
+    if (archiveBtn) archiveBtn.disabled = count === 0;
+    if (deleteBtn) deleteBtn.disabled = count === 0;
+    const selectAll = inventoryTable?.querySelector(".select-all");
+    const visible = [...(inventoryBody?.querySelectorAll("tr[data-edit-product]") || [])].filter(r=>r.style.display!=="none");
+    if (selectAll){
+      const checkedVisible = visible.filter(r=>selectedInventoryIds.has(String(r.dataset.editProduct))).length;
+      selectAll.checked = visible.length > 0 && checkedVisible === visible.length;
+      selectAll.indeterminate = checkedVisible > 0 && checkedVisible < visible.length;
+    }
+  }
+
+  function bulkArchiveSelected(){
+    const ids = [...selectedInventoryIds];
+    if (!ids.length) return;
+    if (!window.confirm(`Archive ${ids.length} selected inventory item${ids.length===1?"":"s"}?`)) return;
+    const list = products();
+    list.forEach(p=>{ if(ids.includes(String(p.id))){ p.archived = true; p.quickPick = false; } });
+    saveProducts(list);
+    selectedInventoryIds.clear();
+    sessionStorage.setItem("sspos_return_inventory", "1");
+    location.reload();
+  }
+
+  function bulkDeleteSelected(){
+    const ids = [...selectedInventoryIds];
+    if (!ids.length) return;
+    if (!window.confirm(`Permanently delete ${ids.length} selected inventory item${ids.length===1?"":"s"}? This cannot be undone.`)) return;
+    const idSet = new Set(ids);
+    saveProducts(products().filter(p=>!idSet.has(String(p.id))));
+    selectedInventoryIds.clear();
+    sessionStorage.setItem("sspos_return_inventory", "1");
+    location.reload();
+  }
 
   function ensureInventoryHeaders(){
     if (!inventoryTable) return;
     const row = inventoryTable.querySelector("thead tr");
     if (!row) return;
     const headers = [...row.children];
+    if (!row.querySelector('[data-extra-header="select"]')){
+      const selectTh = document.createElement("th");
+      selectTh.dataset.extraHeader = "select";
+      selectTh.className = "select-cell";
+      selectTh.innerHTML = '<input class="select-all" type="checkbox" aria-label="Select all visible inventory items">';
+      row.insertBefore(selectTh, row.firstChild);
+      selectTh.querySelector(".select-all").addEventListener("click", e=>{
+        e.stopPropagation();
+        const checked = e.currentTarget.checked;
+        [...inventoryBody.querySelectorAll("tr[data-edit-product]")].forEach(r=>{
+          if (r.style.display === "none") return;
+          const id = String(r.dataset.editProduct);
+          if (checked) selectedInventoryIds.add(id); else selectedInventoryIds.delete(id);
+          const box = r.querySelector(".row-select"); if (box) box.checked = checked;
+        });
+        updateBulkInventoryBar();
+      });
+    }
     if (!row.querySelector('[data-extra-header="barcode"]')){
       const barcodeTh = document.createElement("th");
       barcodeTh.textContent = "Barcode(s)";
@@ -242,6 +325,16 @@
       const id = String(row.dataset.editProduct);
       const p = byId.get(id);
       if (!p) return;
+      if (p.archived){ row.style.display = "none"; return; }
+      row.style.display = "";
+
+      if (!row.querySelector('[data-extra-cell="select"]')){
+        const td = document.createElement("td");
+        td.dataset.extraCell = "select";
+        td.className = "select-cell";
+        td.innerHTML = `<input class="row-select" type="checkbox" ${selectedInventoryIds.has(id)?"checked":""} aria-label="Select ${esc(p.name)}">`;
+        row.insertBefore(td, row.firstChild);
+      }
 
       if (!row.querySelector('[data-extra-cell="barcode"]')){
         const td = document.createElement("td");
@@ -250,7 +343,7 @@
         td.innerHTML = (p.barcodes || []).length
           ? `<div class="barcode-list">${p.barcodes.map(b=>`<span>${esc(b)}</span>`).join("")}</div>`
           : `<span class="muted">No barcode</span>`;
-        const originalCostCell = row.children[3];
+        const originalCostCell = row.children[4];
         row.insertBefore(td, originalCostCell || null);
       }
 
@@ -269,6 +362,8 @@
         row.appendChild(del);
       }
     });
+    ensureBulkInventoryBar();
+    updateBulkInventoryBar();
   }
 
   function toggleQuickPick(row, checked){
@@ -310,6 +405,17 @@
   }
 
   inventoryBody?.addEventListener("click", e => {
+    const rowSelect = e.target.closest(".row-select");
+    if (rowSelect){
+      e.preventDefault();
+      e.stopPropagation();
+      const row = rowSelect.closest("tr[data-edit-product]");
+      const id = String(row.dataset.editProduct);
+      if (rowSelect.checked) selectedInventoryIds.add(id); else selectedInventoryIds.delete(id);
+      rowSelect.checked = selectedInventoryIds.has(id);
+      updateBulkInventoryBar();
+      return;
+    }
     const checkbox = e.target.closest(".home-checkbox");
     if (checkbox){
       e.preventDefault();
@@ -327,11 +433,21 @@
     }
   }, true);
 
+  function removeArchivedProductTiles(){
+    const archived = new Set(products().filter(p=>p.archived).map(p=>String(p.id)));
+    if (!archived.size) return;
+    document.querySelectorAll("[data-product-id]").forEach(el=>{ if(archived.has(String(el.dataset.productId))) el.remove(); });
+  }
+
   if (inventoryBody){
     const observer = new MutationObserver(()=>enhanceInventoryRows());
     observer.observe(inventoryBody, {childList:true});
     enhanceInventoryRows();
   }
+
+  const productObserver = new MutationObserver(removeArchivedProductTiles);
+  productObserver.observe(document.body, {childList:true,subtree:true});
+  removeArchivedProductTiles();
 
   if (sessionStorage.getItem("sspos_return_inventory") === "1"){
     sessionStorage.removeItem("sspos_return_inventory");
