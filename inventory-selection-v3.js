@@ -15,46 +15,28 @@
       -webkit-appearance:none !important;
       width:18px !important;
       height:18px !important;
+      min-width:18px !important;
       border:2px solid #7c8b82 !important;
       border-radius:4px !important;
-      background:#fff !important;
+      background-color:#fff !important;
+      background-repeat:no-repeat !important;
+      background-position:center !important;
+      background-size:13px 13px !important;
       cursor:pointer !important;
-      position:relative !important;
       vertical-align:middle !important;
+      padding:0 !important;
+      margin:0 !important;
     }
     .inventory-table .row-select[data-selected="true"],
     .inventory-table .select-all[data-selected="true"] {
-      background:#267b22 !important;
+      background-color:#267b22 !important;
       border-color:#267b22 !important;
-      box-shadow:inset 0 0 0 2px #267b22 !important;
-    }
-    .inventory-table .row-select[data-selected="true"]::before,
-    .inventory-table .select-all[data-selected="true"]::before {
-      content:"✓" !important;
-      position:absolute !important;
-      inset:0 !important;
-      display:flex !important;
-      align-items:center !important;
-      justify-content:center !important;
-      color:#fff !important;
-      font-size:14px !important;
-      font-weight:900 !important;
-      line-height:1 !important;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M4 10.5l4 4L16 6'/%3E%3C/svg%3E") !important;
     }
     .inventory-table .select-all[data-indeterminate="true"] {
-      background:#267b22 !important;
+      background-color:#267b22 !important;
       border-color:#267b22 !important;
-    }
-    .inventory-table .select-all[data-indeterminate="true"]::before {
-      content:"−" !important;
-      position:absolute !important;
-      inset:0 !important;
-      display:flex !important;
-      align-items:center !important;
-      justify-content:center !important;
-      color:#fff !important;
-      font-size:14px !important;
-      font-weight:900 !important;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath stroke='white' stroke-width='3' stroke-linecap='round' d='M4 10h12'/%3E%3C/svg%3E") !important;
     }
   `;
   document.head.appendChild(style);
@@ -97,8 +79,6 @@
     });
   }
 
-  // Capture before all older inventory handlers. We cancel the native checkbox
-  // action and own both the state and the visual mark ourselves.
   window.addEventListener('click', e => {
     const box = e.target.closest?.('.row-select');
     if (box){
@@ -109,8 +89,6 @@
       const id = String(row.dataset.editProduct);
       if (selected.has(id)) selected.delete(id); else selected.add(id);
       updateUI();
-      // Re-assert after the canceled native checkbox activation fully unwinds.
-      setTimeout(updateUI, 0);
       return;
     }
 
@@ -125,7 +103,6 @@
         if (allSelected) selected.delete(id); else selected.add(id);
       });
       updateUI();
-      setTimeout(updateUI, 0);
     }
   }, true);
 
