@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const CURRENT_BUILD = "0.1.9";
+  const CURRENT_BUILD = "0.1.10";
   const badge = document.getElementById("buildVersionBadge");
   const syncBtn = document.getElementById("cloudSyncBtn");
   const syncText = document.getElementById("cloudSyncText");
