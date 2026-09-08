@@ -2,7 +2,7 @@
 (() => {
   "use strict";
 
-  const TAX_RATE = 0.0825;
+  const TAX_RATE = 0;
   const MAX_QUICK_PICKS = 12;
   const STORAGE_KEYS = {
     products: "sspos_products_v2",
@@ -123,8 +123,8 @@
     const d=state.transactionDiscount;
     if(d?.type==="percent")disc=clamp(subtotal*d.value/100,0,subtotal);
     if(d?.type==="dollar")disc=clamp(d.value,0,subtotal);
-    const taxable=Math.max(0,subtotal-disc),tax=taxable*TAX_RATE;
-    return {subtotal,disc,tax,total:taxable+tax};
+    const total=Math.max(0,subtotal-disc);
+    return {subtotal,disc,tax:0,total};
   }
 
   function renderCart(){
@@ -139,7 +139,7 @@
     if(state.transactionDiscount&&t.disc>0){
       $("discountRow").classList.remove("hidden");$("discountLabel").textContent=state.transactionDiscount.label;$("discountValue").textContent=`-${money(t.disc)}`;
     } else $("discountRow").classList.add("hidden");
-    $("taxValue").textContent=money(t.tax);$("totalValue").textContent=money(t.total);
+    $("totalValue").textContent=money(t.total);
   }
 
   function openModal(title,body){
@@ -231,51 +231,27 @@
       const wantsQuick=$("pfQuickPick").checked;
       if(wantsQuick&&!p.quickPick&&quickPicks().length>=MAX_QUICK_PICKS){showToast(`Home screen is full (${MAX_QUICK_PICKS} items).`);$("pfQuickPick").checked=false;return;}
       p.name=$("pfName").value.trim();p.category=$("pfCategory").value.trim();p.supplier=$("pfSupplier").value.trim()||"None";p.cost=Number($("pfCost").value||0);p.price=Number($("pfPrice").value||0);p.description=$("pfDescription").value.trim();p.barcodes=getBarcodes();p.quickPick=wantsQuick;
-      saveProducts();renderAllProductViews();closeModal();showToast("Inventory item updated.");
+      saveProducts();renderAllProductViews();closeModal();showToast(`${p.name} updated.`);
     });
-    $("receiveStockBtn").addEventListener("click",()=>openReceiveInventory(p.id));
-    $("adjustStockBtn").addEventListener("click",()=>openAdjustInventory(p.id));
+    $("receiveStockBtn").addEventListener("click",()=>openStockModal(p,"receive"));
+    $("adjustStockBtn").addEventListener("click",()=>openStockModal(p,"adjust"));
   }
 
-  function addMovement(productId,delta,reason,note){
-    state.movements.unshift({id:uid("move"),productId,delta,reason,note:note||"",timestamp:new Date().toISOString(),employee:"Owner"});
-    saveMovements();
-  }
-
+  function addMovement(productId,delta,type,note){state.movements.unshift({id:uid("move"),productId,delta:Number(delta),type,note:note||"",at:new Date().toISOString()});saveMovements();}
   function renderMovementHistory(productId){
     const host=$("movementHistory");if(!host)return;
-    const list=state.movements.filter(m=>m.productId===productId).slice(0,15);
-    host.innerHTML=`<div class="section-head" style="margin-bottom:6px"><h2>Inventory History</h2></div><div class="history-list">${list.length?list.map(m=>`<div class="history-item"><div><strong>${m.delta>0?"+":""}${m.delta}</strong> ${esc(m.reason)}<br><span>${esc(m.note||"")}</span></div><span>${new Date(m.timestamp).toLocaleString()}</span></div>`).join(""):`<div class="muted">No inventory movements recorded yet.</div>`}</div>`;
+    const rows=state.movements.filter(m=>m.productId===productId).slice(0,8);
+    host.innerHTML=rows.length?`<div class="movement-title">Recent Inventory Changes</div>${rows.map(m=>`<div class="movement-row"><span>${esc(m.type)}${m.note?` — ${esc(m.note)}`:""}</span><strong class="${m.delta>=0?"move-in":"move-out"}">${m.delta>=0?"+":""}${m.delta}</strong></div>`).join("")}`:"";
   }
 
-  function openReceiveInventory(productId){
-    const p=state.products.find(x=>x.id===productId);if(!p)return;
-    openModal("Add Received Inventory",`<form id="receiveForm"><div class="form-grid">
-      <div class="field"><label>Product</label><input value="${esc(p.name)}" disabled></div>
-      <div class="field"><label>Quantity Received *</label><input id="receiveQty" type="number" min="1" step="1" required></div>
-      <div class="field"><label>Unit Cost</label><input id="receiveCost" type="number" min="0" step="0.01" value="${Number(p.cost||0).toFixed(2)}"></div>
-      <div class="field"><label>Supplier</label><input id="receiveSupplier" value="${esc(p.supplier==="None"?"":p.supplier)}"></div>
-      <div class="field full"><label>PO / Reference / Note</label><input id="receiveNote"></div>
-    </div><div class="modal-actions"><button class="secondary-btn" data-close-modal type="button">Cancel</button><button class="primary-btn" type="submit">Add Inventory</button></div></form>`);
-    $("receiveForm").addEventListener("submit",e=>{
-      e.preventDefault();const qty=Math.max(1,Math.floor(Number($("receiveQty").value||0)));p.inventory=Number(p.inventory||0)+qty;
-      const cost=Number($("receiveCost").value||0);if(Number.isFinite(cost)&&cost>=0)p.cost=cost;
-      const sup=$("receiveSupplier").value.trim();if(sup)p.supplier=sup;
-      addMovement(p.id,qty,"Received Inventory",$("receiveNote").value.trim());saveProducts();renderAllProductViews();closeModal();showToast(`${qty} added to ${p.name}.`);
-    });
-  }
-
-  function openAdjustInventory(productId){
-    const p=state.products.find(x=>x.id===productId);if(!p)return;
-    openModal("Adjust Inventory Count",`<form id="adjustForm"><div class="form-grid">
-      <div class="field"><label>Current Count</label><input value="${Number(p.inventory||0)}" disabled></div>
-      <div class="field"><label>New Count *</label><input id="newCount" type="number" min="0" step="1" required value="${Number(p.inventory||0)}"></div>
-      <div class="field full"><label>Reason *</label><select id="adjustReason" required><option value="">Select reason</option><option>Physical Count Correction</option><option>Damaged</option><option>Missing / Shrink</option><option>Expired / Discarded</option><option>Return to Vendor</option><option>Other</option></select></div>
-      <div class="field full"><label>Note</label><textarea id="adjustNote" rows="3"></textarea></div>
-    </div><div class="modal-actions"><button class="secondary-btn" data-close-modal type="button">Cancel</button><button class="primary-btn" type="submit">Save Count</button></div></form>`);
-    $("adjustForm").addEventListener("submit",e=>{
-      e.preventDefault();const next=Math.max(0,Math.floor(Number($("newCount").value||0))),old=Number(p.inventory||0),delta=next-old,reason=$("adjustReason").value;if(!reason)return;
-      p.inventory=next;addMovement(p.id,delta,reason,$("adjustNote").value.trim());saveProducts();renderAllProductViews();closeModal();showToast(`Inventory count set to ${next}.`);
+  function openStockModal(p,mode){
+    const title=mode==="receive"?`Receive Inventory — ${p.name}`:`Adjust Inventory — ${p.name}`;
+    openModal(title,`<form id="stockForm"><div class="field"><label>${mode==="receive"?"Quantity Received":"New Physical Count"}</label><input id="stockQty" type="number" min="0" step="1" required autofocus></div><div class="field"><label>Note / Reference</label><input id="stockNote" placeholder="PO, correction reason, etc."></div><div class="modal-actions"><button class="secondary-btn" type="button" data-close-modal>Cancel</button><button class="primary-btn" type="submit">Save Inventory</button></div></form>`);
+    $("stockForm").addEventListener("submit",e=>{
+      e.preventDefault();const n=Math.max(0,Math.floor(Number($("stockQty").value||0))),old=Number(p.inventory||0);
+      if(mode==="receive"){p.inventory=old+n;addMovement(p.id,n,"Received",$("stockNote").value.trim());}
+      else {p.inventory=n;addMovement(p.id,n-old,"Count Adjustment",$("stockNote").value.trim());}
+      saveProducts();renderInventory();closeModal();showToast(`${p.name} inventory is now ${p.inventory}.`);
     });
   }
 
@@ -296,119 +272,62 @@
 
   function renderAllProductViews(){renderQuickPicks();renderCategories();renderInventory();}
 
-  function openLineEditor(lineId){
-    const l=state.cart.find(x=>x.lineId===lineId);if(!l)return;
-    openModal("Edit Line Item",`<form id="lineEditForm"><div class="muted">${esc(l.name)} • Original price ${money(l.price)}</div><div class="form-grid" style="margin-top:12px">
-      <div class="field"><label>Change price to</label><input id="linePrice" type="number" min="0" step="0.01"></div>
-      <div class="field"><label>Discount type</label><select id="lineDiscountType"><option value="">None</option><option value="percent">Percentage</option><option value="dollar">Dollar amount</option></select></div>
-      <div class="field"><label>Discount value</label><input id="lineDiscountValue" type="number" min="0" step="0.01"></div>
-      <div class="field"><label>Reason *</label><select id="lineReason" required><option value="">Select reason</option><option>Damaged Item</option><option>Manager Discount</option><option>Price Match</option><option>Promotion</option><option>Customer Courtesy</option><option>Clearance</option><option>Employee Discount</option><option>Other</option></select></div>
-      <div class="field full"><label>Note</label><textarea id="lineNote" rows="3"></textarea></div>
-    </div><div class="modal-actions"><button id="clearLineAdj" class="secondary-btn" type="button">Remove Adjustment</button><button class="secondary-btn" data-close-modal type="button">Cancel</button><button class="primary-btn" type="submit">Apply</button></div></form>`);
-    if(l.adjustment){$("lineReason").value=l.adjustment.reason||"";$("lineNote").value=l.adjustment.note||"";if(l.adjustment.type==="price")$("linePrice").value=l.adjustment.value;else{$("lineDiscountType").value=l.adjustment.type;$("lineDiscountValue").value=l.adjustment.value;}}
-    $("clearLineAdj").addEventListener("click",()=>{l.adjustment=null;renderCart();closeModal();});
-    $("lineEditForm").addEventListener("submit",e=>{
-      e.preventDefault();const reason=$("lineReason").value;if(!reason)return;const price=$("linePrice").value.trim(),type=$("lineDiscountType").value,val=Number($("lineDiscountValue").value||0),note=$("lineNote").value.trim();
-      if(price!==""){const v=Math.max(0,Number(price));l.adjustment={type:"price",value:v,reason,note,label:`Price ${money(v)}`};}
-      else if(type&&val>0){const v=type==="percent"?clamp(val,0,100):Math.max(0,val);l.adjustment={type,value:v,reason,note,label:type==="percent"?`${v}% off`:`${money(v)} off`};}
-      else l.adjustment=null;renderCart();closeModal();
-    });
+  function openLineAdjustment(line){
+    openModal(`Edit ${line.name}`,`<form id="lineForm">
+      <div class="field"><label>Action</label><select id="lineAction"><option value="price">Change Price</option><option value="percent">Discount %</option><option value="dollar">Discount $</option></select></div>
+      <div class="field"><label>Value</label><input id="lineValue" type="number" min="0" step="0.01" required></div>
+      <div class="field"><label>Reason</label><select id="lineReason"><option>Customer Service</option><option>Damaged Packaging</option><option>Price Match</option><option>Promotion</option><option>Manager Override</option><option>Other</option></select></div>
+      <div class="modal-actions"><button id="clearLineAdj" class="secondary-btn" type="button">Clear Adjustment</button><button class="primary-btn" type="submit">Apply</button></div>
+    </form>`);
+    $("lineForm").addEventListener("submit",e=>{e.preventDefault();const type=$("lineAction").value,value=Number($("lineValue").value||0),reason=$("lineReason").value;line.adjustment={type,value,reason,label:type==="price"?`Price ${money(value)}`:type==="percent"?`${value}% off`:`${money(value)} off`};renderCart();closeModal();});
+    $("clearLineAdj").addEventListener("click",()=>{line.adjustment=null;renderCart();closeModal();});
   }
 
-  function openDiscountMenu(){
-    openModal("Discount",`<div class="choice-list">
-      <button class="choice-btn" data-discount-choice="employee" type="button"><strong>Employee Discount</strong><span>Standard 25% off the transaction.</span></button>
-      <button class="choice-btn" data-discount-choice="percent" type="button"><strong>Miscellaneous Discount Percentage</strong><span>Enter a custom percentage.</span></button>
-      <button class="choice-btn" data-discount-choice="dollar" type="button"><strong>Miscellaneous Discount Dollar Amount</strong><span>Enter a custom dollar amount.</span></button>
-    </div>${state.transactionDiscount?`<div class="modal-actions"><button id="removeTxnDiscount" class="secondary-btn" type="button">Remove Current Discount</button></div>`:""}`);
-    document.querySelectorAll("[data-discount-choice]").forEach(b=>b.addEventListener("click",()=>{
-      const choice=b.dataset.discountChoice;if(choice==="employee"){state.transactionDiscount={type:"percent",value:25,label:"Employee Discount (25%)"};renderCart();closeModal();return;}
-      openMiscDiscount(choice);
-    }));
-    $("removeTxnDiscount")?.addEventListener("click",()=>{state.transactionDiscount=null;renderCart();closeModal();});
+  function openTransactionDiscount(){
+    openModal("Discount",`<div class="discount-options">
+      <button class="discount-option" data-disc="employee" type="button"><strong>Employee Discount</strong><span>25%</span></button>
+      <button class="discount-option" data-disc="percent" type="button"><strong>Miscellaneous Discount Percentage</strong><span>Enter %</span></button>
+      <button class="discount-option" data-disc="dollar" type="button"><strong>Miscellaneous Discount Dollar Amount</strong><span>Enter $</span></button>
+    </div>`);
   }
 
-  function openMiscDiscount(type){
-    const pct=type==="percent";
-    openModal(pct?"Miscellaneous Discount Percentage":"Miscellaneous Discount Dollar Amount",`<form id="miscDiscountForm"><div class="field"><label>${pct?"Percentage":"Dollar amount"}</label><input id="miscVal" type="number" min="0" ${pct?'max="100"':""} step="0.01" required></div><div class="modal-actions"><button class="secondary-btn" data-close-modal type="button">Cancel</button><button class="primary-btn" type="submit">Apply</button></div></form>`);
-    $("miscDiscountForm").addEventListener("submit",e=>{e.preventDefault();let v=Number($("miscVal").value||0);if(v<=0)return;if(pct)v=clamp(v,0,100);state.transactionDiscount={type,value:v,label:pct?`Misc. Discount (${v}%)`:`Misc. Discount (${money(v)})`};renderCart();closeModal();});
+  function selectCustomer(c){state.customer=c;$("customerSearch").classList.add("hidden");$("customerResults").classList.add("hidden");$("selectedCustomer").classList.remove("hidden");$("selectedCustomer").innerHTML=`<div><strong>${esc(c.name)} <span class="verified">✓</span></strong><span>${esc(c.phone||c.email||"Customer")}</span></div><button id="clearCustomer" type="button">×</button>`;$("clearCustomer").addEventListener("click",()=>{state.customer=null;$("selectedCustomer").classList.add("hidden");$("customerSearch").classList.remove("hidden");$("customerSearch").value="";});}
+
+  function openCustomerForm(){
+    openModal("Add Customer",`<form id="customerForm"><div class="form-grid"><div class="field full"><label>Name *</label><input id="cfName" required></div><div class="field"><label>Email</label><input id="cfEmail" type="email"></div><div class="field"><label>Phone</label><input id="cfPhone"></div><div class="field"><label>Birth Date *</label><input id="cfDob" type="date" required></div></div><div class="helper">Birth date is required. Once entered after checking ID, the customer is treated as age verified on future visits. Email or phone is required to participate in marketing promotions.</div><div class="modal-actions"><button class="secondary-btn" type="button" data-close-modal>Cancel</button><button class="primary-btn" type="submit">Save Customer</button></div></form>`);
+    $("customerForm").addEventListener("submit",e=>{e.preventDefault();const c={id:uid("cust"),name:$("cfName").value.trim(),email:$("cfEmail").value.trim(),phone:$("cfPhone").value.trim(),birthDate:$("cfDob").value,ageVerified:true,points:0,reward:0};if(!c.name||!c.birthDate)return;state.customers.push(c);saveCustomers();closeModal();selectCustomer(c);showToast("Customer added and age verified.");});
   }
 
-  function openNewCustomer(){
-    openModal("New Customer",`<form id="customerForm"><div class="form-grid">
-      <div class="field"><label>Name *</label><input id="cfName" required></div><div class="field"><label>Birth Date *</label><input id="cfDob" type="date" required></div>
-      <div class="field"><label>Phone</label><input id="cfPhone" type="tel"></div><div class="field"><label>Email</label><input id="cfEmail" type="email"></div>
-    </div><p class="muted">Phone and email are optional. Without at least one, the customer is not eligible for electronic marketing. Saving the record confirms the first ID check and marks age verification OK for future sales.</p><div class="modal-actions"><button class="secondary-btn" data-close-modal type="button">Cancel</button><button class="primary-btn" type="submit">Save Customer</button></div></form>`);
-    $("customerForm").addEventListener("submit",e=>{e.preventDefault();const c={id:uid("cust"),name:$("cfName").value.trim(),birthDate:$("cfDob").value,phone:$("cfPhone").value.trim(),email:$("cfEmail").value.trim(),ageVerified:true,points:0,reward:0};if(!c.name||!c.birthDate)return;state.customers.push(c);saveCustomers();state.customer=c;renderCustomer();closeModal();});
-  }
-
-  function renderCustomer(){
-    const c=state.customer;if(!c){$("selectedCustomer").classList.add("hidden");return;}
-    $("selectedCustomer").classList.remove("hidden");$("selectedCustomer").innerHTML=`<div><strong>${esc(c.name)} <span class="verified">✓</span></strong><div class="verified">✓ Age Verified</div></div><div class="loyalty"><strong>${c.points||0} pts</strong><br>${c.reward?`${money(c.reward)} Reward`:"No reward"}</div>`;
-  }
-
-  function searchCustomers(q){
-    q=q.trim().toLowerCase();if(!q){$("customerResults").classList.add("hidden");return;}
-    const list=state.customers.filter(c=>`${c.name} ${c.phone} ${c.email}`.toLowerCase().includes(q)).slice(0,8);
-    $("customerResults").innerHTML=list.map(c=>`<button class="customer-result" data-customer-id="${esc(c.id)}" type="button"><strong>${esc(c.name)} ${c.ageVerified?"✓":""}</strong><br><span class="muted">${esc(c.phone||c.email||"No marketing contact")}</span></button>`).join("")||`<div class="customer-result">No matches.</div>`;
-    $("customerResults").classList.remove("hidden");
-  }
-
-  function openSplitPayment(){
-    const t=calcTotals();if(t.total<=0){showToast("Add items first.");return;}
-    openModal("Split Payment",`<form id="splitForm"><div class="form-grid"><div class="field"><label>First payment amount</label><input id="splitAmount" type="number" min="0" max="${t.total.toFixed(2)}" step="0.01" required></div><div class="field"><label>First payment type</label><select id="splitType"><option>Cash</option><option>Card</option></select></div></div><div class="stock-card" style="margin-top:10px"><div>Total due <strong style="float:right">${money(t.total)}</strong></div><div style="margin-top:7px">Remaining <strong id="splitRemain" style="float:right">${money(t.total)}</strong></div></div><div class="modal-actions"><button class="secondary-btn" data-close-modal type="button">Cancel</button><button class="primary-btn" type="submit">Continue</button></div></form>`);
-    $("splitAmount").addEventListener("input",()=>{const a=clamp(Number($("splitAmount").value||0),0,t.total);$("splitRemain").textContent=money(t.total-a);});
-    $("splitForm").addEventListener("submit",e=>{e.preventDefault();const a=clamp(Number($("splitAmount").value||0),0,t.total);if(a<=0||a>=t.total){showToast("Enter an amount between $0 and the total.");return;}closeModal();showToast(`${$("splitType").value} ${money(a)} + remaining ${money(t.total-a)} ready.`);});
-  }
-
-  function completeSale(method){
-    const t=calcTotals();if(!state.cart.length){showToast("Add items first.");return;}
-    // Prototype inventory decrement for tracked stock greater than zero.
-    state.cart.forEach(line=>{const p=state.products.find(x=>x.id===line.productId);if(p&&Number(p.inventory||0)>0){const dec=Math.min(line.qty,p.inventory);p.inventory-=dec;if(dec)addMovement(p.id,-dec,"Sale",method);}});
-    saveProducts();state.cart=[];state.transactionDiscount=null;state.saleNote="";state.customer=null;renderCustomer();renderCart();renderInventory();showToast(`${method} sale ${money(t.total)} completed (prototype).`);
-  }
-
-  function switchView(view){
-    document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-    $("saleView").classList.add("hidden");$("inventoryView").classList.add("hidden");$("placeholderView").classList.add("hidden");
-    // Cart remains visible for every module on desktop, matching the permanent transaction panel design.
-    if(view==="sale")$("saleView").classList.remove("hidden");
-    else if(view==="inventory"){$("inventoryView").classList.remove("hidden");renderInventory();}
-    else{$("placeholderTitle").textContent=document.querySelector(`.nav-btn[data-view="${CSS.escape(view)}"] span`)?.textContent||"Module";$("placeholderView").classList.remove("hidden");}
+  function completePayment(type){
+    const t=calcTotals();if(!state.cart.length){showToast("Add an item before taking payment.");return;}
+    openModal(`${type} Payment`,`<div class="payment-summary"><span>Amount Due</span><strong>${money(t.total)}</strong></div><div class="helper">Payment hardware integration will be connected in a later implementation phase.</div><div class="modal-actions"><button class="secondary-btn" type="button" data-close-modal>Cancel</button><button id="finishPay" class="primary-btn" type="button">Complete ${type} Sale</button></div>`);
+    $("finishPay").addEventListener("click",()=>{state.cart=[];state.transactionDiscount=null;state.saleNote="";renderCart();closeModal();showToast("Sale completed.");});
   }
 
   document.addEventListener("click",e=>{
-    const nav=e.target.closest(".nav-btn");if(nav){switchView(nav.dataset.view);return;}
+    const nav=e.target.closest(".nav-btn");if(nav){document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("active"));nav.classList.add("active");const v=nav.dataset.view;$("saleView").classList.toggle("hidden",v!=="sale");$("inventoryView").classList.toggle("hidden",v!=="inventory");$("placeholderView").classList.toggle("hidden",v==="sale"||v==="inventory");if(v!=="sale"&&v!=="inventory")$("placeholderTitle").textContent=nav.innerText.trim();return;}
     const prod=e.target.closest("[data-product-id]");if(prod){addProductToCart(prod.dataset.productId);return;}
     const cat=e.target.closest("[data-category]");if(cat){openCategory(cat.dataset.category);return;}
     const inv=e.target.closest("[data-edit-product]");if(inv){openEditProduct(inv.dataset.editProduct);return;}
-    const customer=e.target.closest("[data-customer-id]");if(customer){state.customer=state.customers.find(c=>c.id===customer.dataset.customerId)||null;renderCustomer();$("customerResults").classList.add("hidden");$("customerSearch").value="";return;}
-    const act=e.target.closest("[data-cart-act]");if(act){e.stopPropagation();const i=Number(act.dataset.i),l=state.cart[i];if(!l)return;if(act.dataset.cartAct==="plus")l.qty++;if(act.dataset.cartAct==="minus"){l.qty--;if(l.qty<=0)state.cart.splice(i,1);}if(act.dataset.cartAct==="remove")state.cart.splice(i,1);renderCart();return;}
-    const line=e.target.closest(".cart-line");if(line){openLineEditor(line.dataset.lineId);return;}
-    if(e.target.closest("[data-close-modal]")||e.target===$("modalBackdrop"))closeModal();
-  });
-
-  $("productSearch").addEventListener("keydown",e=>{
-    if(e.key!=="Enter")return;e.preventDefault();const q=e.currentTarget.value.trim();if(!q)return;
-    const exact=findBarcode(q);if(exact){addProductToCart(exact.id);e.currentTarget.value="";return;}
-    const match=state.products.find(p=>`${p.name} ${p.category} ${p.supplier}`.toLowerCase().includes(q.toLowerCase()));
-    if(match){addProductToCart(match.id);e.currentTarget.value="";}else showToast("No matching product or barcode.");
+    const ca=e.target.closest("[data-cart-act]");if(ca){const i=Number(ca.dataset.i),l=state.cart[i];if(!l)return;e.stopPropagation();if(ca.dataset.cartAct==="plus")l.qty++;if(ca.dataset.cartAct==="minus"){l.qty--;if(l.qty<=0)state.cart.splice(i,1);}if(ca.dataset.cartAct==="remove")state.cart.splice(i,1);renderCart();return;}
+    const line=e.target.closest(".cart-line");if(line){const l=state.cart.find(x=>x.lineId===line.dataset.lineId);if(l)openLineAdjustment(l);return;}
+    if(e.target.closest("[data-close-modal]")){closeModal();return;}
+    const disc=e.target.closest("[data-disc]");if(disc){const kind=disc.dataset.disc;if(kind==="employee"){state.transactionDiscount={type:"percent",value:25,label:"Employee Discount"};renderCart();closeModal();return;}const label=kind==="percent"?"Miscellaneous Discount %":"Miscellaneous Discount $";openModal(label,`<form id="miscDiscForm"><div class="field"><label>${kind==="percent"?"Percentage":"Dollar Amount"}</label><input id="miscDiscValue" type="number" min="0" step="0.01" required></div><div class="modal-actions"><button class="secondary-btn" type="button" data-close-modal>Cancel</button><button class="primary-btn" type="submit">Apply Discount</button></div></form>`);$("miscDiscForm").addEventListener("submit",ev=>{ev.preventDefault();state.transactionDiscount={type:kind,value:Number($("miscDiscValue").value||0),label};renderCart();closeModal();});return;}
   });
 
   $("closeCategoryBtn").addEventListener("click",()=>$("categoryResults").classList.add("hidden"));
-  $("inventorySearch").addEventListener("input",renderInventory);
-  $("inventoryCategoryFilter").addEventListener("change",renderInventory);
-  $("quickPickOnly").addEventListener("change",renderInventory);
   $("addProductBtn").addEventListener("click",openAddProduct);
-  $("customerSearch").addEventListener("input",e=>searchCustomers(e.currentTarget.value));
-  $("newCustomerBtn").addEventListener("click",openNewCustomer);
-  $("discountBtn").addEventListener("click",openDiscountMenu);
-  $("splitPaymentBtn").addEventListener("click",openSplitPayment);
-  $("cashBtn").addEventListener("click",()=>completeSale("Cash"));
-  $("cardBtn").addEventListener("click",()=>completeSale("Card"));
-  $("clearSaleBtn").addEventListener("click",()=>{if(!state.cart.length||confirm("Clear current sale?")){state.cart=[];state.transactionDiscount=null;renderCart();}});
-  $("holdSaleBtn").addEventListener("click",()=>showToast("Hold Sale is reserved for the next transaction-storage batch."));
-  $("saleNoteBtn").addEventListener("click",()=>{openModal("Sale Note",`<div class="field"><label>Note</label><textarea id="saleNoteText" rows="5">${esc(state.saleNote)}</textarea></div><div class="modal-actions"><button class="secondary-btn" data-close-modal type="button">Cancel</button><button id="saveSaleNote" class="primary-btn" type="button">Save</button></div>`);$("saveSaleNote").addEventListener("click",()=>{state.saleNote=$("saleNoteText").value.trim();closeModal();});});
+  $("inventorySearch").addEventListener("input",renderInventory);$("inventoryCategoryFilter").addEventListener("change",renderInventory);$("quickPickOnly").addEventListener("change",renderInventory);
+  $("discountBtn").addEventListener("click",openTransactionDiscount);
+  $("clearSaleBtn").addEventListener("click",()=>{if(!state.cart.length)return;if(confirm("Clear this sale?")){state.cart=[];state.transactionDiscount=null;state.saleNote="";renderCart();}});
+  $("cashBtn").addEventListener("click",()=>completePayment("Cash"));$("cardBtn").addEventListener("click",()=>completePayment("Card"));
+  $("splitPaymentBtn").addEventListener("click",()=>{if(!state.cart.length){showToast("Add items before splitting payment.");return;}openModal("Split Payment",`<div class="payment-summary"><span>Total Due</span><strong>${money(calcTotals().total)}</strong></div><div class="field"><label>First Payment Amount</label><input type="number" step="0.01" min="0"></div><div class="field"><label>First Payment Type</label><select><option>Cash</option><option>Card</option></select></div><div class="helper">Second payment will automatically use the remaining balance.</div>`);});
+  $("holdSaleBtn").addEventListener("click",()=>showToast("Sale held locally. Cloud hold queue will be added later."));
+  $("saleNoteBtn").addEventListener("click",()=>openModal("Sale Note",`<div class="field"><label>Note</label><textarea id="saleNoteText" rows="5">${esc(state.saleNote)}</textarea></div><div class="modal-actions"><button id="saveSaleNote" class="primary-btn" type="button">Save Note</button></div>`));
+  document.addEventListener("click",e=>{if(e.target.id==="saveSaleNote"){state.saleNote=$("saleNoteText").value;closeModal();showToast("Sale note saved.");}});
+  $("newCustomerBtn").addEventListener("click",openCustomerForm);
+  $("customerSearch").addEventListener("input",()=>{const q=$("customerSearch").value.trim().toLowerCase();if(!q){$("customerResults").classList.add("hidden");return;}const rows=state.customers.filter(c=>`${c.name} ${c.phone} ${c.email}`.toLowerCase().includes(q)).slice(0,8);$("customerResults").innerHTML=rows.map(c=>`<button type="button" data-customer-id="${esc(c.id)}"><strong>${esc(c.name)}</strong><span>${esc(c.phone||c.email||"")}</span></button>`).join("")||`<div class="no-results">No customers found.</div>`;$("customerResults").classList.remove("hidden");});
+  $("customerResults").addEventListener("click",e=>{const b=e.target.closest("[data-customer-id]");if(!b)return;const c=state.customers.find(x=>x.id===b.dataset.customerId);if(c)selectCustomer(c);});
 
-  renderAllProductViews();renderCart();renderCustomer();updateClock();setInterval(updateClock,30000);
+  updateClock();setInterval(updateClock,1000);renderAllProductViews();renderCart();
 })();
