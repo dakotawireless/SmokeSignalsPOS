@@ -1,6 +1,7 @@
 (() => {
   "use strict";
 
+  const BUILD_VERSION = "0.1.9";
   const inventorySearch = document.getElementById("inventorySearch");
   const modalBackdrop = document.getElementById("modalBackdrop");
   const toast = document.getElementById("toast");
@@ -39,6 +40,73 @@
     return true;
   }
 
+  function installBuildStatus(){
+    const logo = document.querySelector(".cart-logo");
+    if (!logo || document.getElementById("buildStatusBar")) return;
+
+    const style = document.createElement("style");
+    style.textContent = `
+      .cart-logo{height:auto !important;min-height:74px !important;padding:7px 10px 9px !important;align-content:center !important;gap:5px !important}
+      .cart-build-status{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#dce5df;font-size:10px;line-height:1}
+      .build-version-badge{font-weight:900;letter-spacing:.03em;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:5px 8px;white-space:nowrap}
+      .cloud-sync-btn{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:850;display:flex;align-items:center;gap:5px;white-space:nowrap}
+      .cloud-sync-dot{width:7px;height:7px;border-radius:50%;background:#7d8b83;box-shadow:0 0 0 2px rgba(255,255,255,.05)}
+      .cloud-sync-btn[data-state="ok"] .cloud-sync-dot{background:#4fd14a}
+      .cloud-sync-btn[data-state="syncing"] .cloud-sync-dot{background:#e6bf38;animation:sssyncpulse .8s ease-in-out infinite alternate}
+      .cloud-sync-btn[data-state="update"] .cloud-sync-dot{background:#f39c36}
+      .cloud-sync-btn[data-state="error"] .cloud-sync-dot{background:#df4d4d}
+      @keyframes sssyncpulse{from{opacity:.4}to{opacity:1}}
+      .cart-logo img{margin-top:1px}
+    `;
+    document.head.appendChild(style);
+
+    const bar = document.createElement("div");
+    bar.id = "buildStatusBar";
+    bar.className = "cart-build-status";
+    bar.innerHTML = `
+      <span class="build-version-badge">Build v${BUILD_VERSION}</span>
+      <button id="cloudSyncBuildBtn" class="cloud-sync-btn" data-state="syncing" type="button" title="Check for the latest deployed POS build">
+        <span class="cloud-sync-dot"></span><span id="cloudSyncBuildText">Cloud Sync</span>
+      </button>`;
+    logo.insertBefore(bar, logo.firstChild);
+
+    const btn = document.getElementById("cloudSyncBuildBtn");
+    const text = document.getElementById("cloudSyncBuildText");
+
+    function setSyncStatus(label,state){
+      if(text) text.textContent = label;
+      if(btn) btn.dataset.state = state;
+    }
+
+    async function checkBuild(forceReload=false){
+      try{
+        setSyncStatus("Checking…","syncing");
+        const res = await fetch(`build.json?ts=${Date.now()}`, {cache:"no-store"});
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const info = await res.json();
+        const latest = String(info.version || "");
+        if(latest && latest !== BUILD_VERSION){
+          setSyncStatus(`Update v${latest}`,"update");
+          if(forceReload){
+            const u = new URL(location.href);
+            u.searchParams.set("build", latest);
+            location.replace(u.toString());
+          }
+          return;
+        }
+        setSyncStatus("Cloud Synced","ok");
+      }catch(err){
+        console.warn("Cloud build check failed",err);
+        setSyncStatus("Sync unavailable","error");
+      }
+    }
+
+    btn?.addEventListener("click",()=>checkBuild(true));
+    checkBuild(false);
+  }
+
+  installBuildStatus();
+
   // Inventory/product edit dialogs are deliberate work areas. Clicking the dimmed
   // page behind a dialog must never discard the employee's edits.
   if (modalBackdrop){
@@ -69,9 +137,6 @@
 
       const now = performance.now();
 
-      // Do not allow the later document-level scanner listener to interfere with
-      // this search box. stopPropagation does not cancel the browser's normal text
-      // editing/default action.
       e.stopPropagation();
 
       if (e.key === "Enter"){
