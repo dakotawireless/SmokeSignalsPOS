@@ -63,9 +63,8 @@
   function quickPicks(){ return state.products.filter(p=>p.quickPick).slice(0,MAX_QUICK_PICKS); }
 
   function productTile(p){
-    const mark = p.supplier && p.supplier !== "None" ? p.supplier : p.category;
     return `<button class="product-tile" type="button" data-product-id="${esc(p.id)}">
-      <div><div class="brand-mark">${esc(mark)}</div><div class="product-name">${esc(p.name)}</div></div>
+      <div class="product-name">${esc(p.name)}</div>
       <div class="price">${money(p.price)}</div>
     </button>`;
   }
