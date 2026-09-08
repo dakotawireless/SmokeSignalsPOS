@@ -1,27 +1,27 @@
 (() => {
   "use strict";
 
-  const CURRENT_BUILD = "0.1.11";
-  let badge = document.getElementById("buildVersionBadge");
-  let syncBtn = document.getElementById("cloudSyncBtn");
-  let syncText = document.getElementById("cloudSyncText");
+  const CURRENT_BUILD = "0.1.12";
+  const cartLogo = document.querySelector('.cart-logo');
+  if (!cartLogo) return;
 
-  if (!badge || !syncBtn || !syncText) {
-    const cartLogo = document.querySelector('.cart-logo');
-    if (cartLogo) {
-      const bar = document.createElement('div');
-      bar.className = 'build-sync-bar';
-      bar.innerHTML = `
-        <span class="build-version-pill">Build <strong id="buildVersionBadge">v${CURRENT_BUILD}</strong></span>
-        <button id="cloudSyncBtn" class="cloud-sync-btn" type="button" data-state="syncing">
-          <span class="sync-dot"></span><span id="cloudSyncText">Checking…</span>
-        </button>`;
-      cartLogo.insertBefore(bar, cartLogo.firstChild);
-      badge = document.getElementById("buildVersionBadge");
-      syncBtn = document.getElementById("cloudSyncBtn");
-      syncText = document.getElementById("cloudSyncText");
-    }
-  }
+  // Remove every older/duplicate build-status control before creating the one
+  // authoritative indicator for this build.
+  cartLogo.querySelectorAll('#buildStatusBar,.cart-build-status,.build-sync-bar').forEach(el => el.remove());
+
+  const bar = document.createElement('div');
+  bar.className = 'build-sync-bar';
+  bar.id = 'buildSyncBar';
+  bar.innerHTML = `
+    <span class="build-version-pill">Build <strong id="buildVersionBadge">v${CURRENT_BUILD}</strong></span>
+    <button id="cloudSyncBtn" class="cloud-sync-btn" type="button" data-state="syncing">
+      <span class="sync-dot"></span><span id="cloudSyncText">Checking…</span>
+    </button>`;
+  cartLogo.insertBefore(bar, cartLogo.firstChild);
+
+  const badge = document.getElementById("buildVersionBadge");
+  const syncBtn = document.getElementById("cloudSyncBtn");
+  const syncText = document.getElementById("cloudSyncText");
 
   const style = document.createElement('style');
   style.textContent = `
@@ -36,11 +36,11 @@
   document.head.appendChild(style);
 
   function setStatus(text, state="ok"){
-    if(syncText) syncText.textContent = text;
-    if(syncBtn) syncBtn.dataset.state = state;
+    syncText.textContent = text;
+    syncBtn.dataset.state = state;
   }
 
-  if(badge) badge.textContent = `v${CURRENT_BUILD}`;
+  badge.textContent = `v${CURRENT_BUILD}`;
 
   async function checkLatestBuild(forceReload=false){
     try{
@@ -51,7 +51,7 @@
       const latest = String(info.version || "");
 
       if(latest && latest !== CURRENT_BUILD){
-        setStatus("Update available", "update");
+        setStatus(`Update v${latest}`, "update");
         if(forceReload){
           const url = new URL(location.href);
           url.searchParams.set("build", latest);
@@ -67,6 +67,6 @@
     }
   }
 
-  syncBtn?.addEventListener("click", ()=>checkLatestBuild(true));
+  syncBtn.addEventListener("click", ()=>checkLatestBuild(true));
   checkLatestBuild(false);
 })();
