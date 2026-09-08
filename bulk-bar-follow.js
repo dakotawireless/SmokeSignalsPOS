@@ -5,9 +5,10 @@
   const main = document.querySelector(".main");
   if (!inventoryView || !main) return;
 
-  let placeholder = null;
   let activeBar = null;
-  let originalTop = 0;
+  let placeholder = null;
+  let anchorTop = 0;
+  let rafPending = false;
 
   const style = document.createElement("style");
   style.textContent = `
@@ -41,9 +42,12 @@
     activeBar.classList.remove("bulk-following");
     activeBar.style.left = "";
     activeBar.style.width = "";
-    if (placeholder){ placeholder.remove(); placeholder = null; }
+    if (placeholder){
+      placeholder.remove();
+      placeholder = null;
+    }
     activeBar = null;
-    originalTop = 0;
+    anchorTop = 0;
   }
 
   function pin(bar){
@@ -51,7 +55,7 @@
       release();
       activeBar = bar;
       const rect = bar.getBoundingClientRect();
-      originalTop = window.scrollY + rect.top;
+      anchorTop = window.scrollY + rect.top;
       placeholder = document.createElement("div");
       placeholder.className = "bulk-bar-placeholder";
       placeholder.style.height = `${rect.height + 20}px`;
@@ -59,16 +63,15 @@
     }
 
     const mainRect = main.getBoundingClientRect();
-    const barRect = bar.getBoundingClientRect();
-    const left = Math.max(mainRect.left + 18, 0);
-    const width = Math.max(mainRect.width - 36, 280);
-    bar.classList.add("bulk-following");
-    bar.style.left = `${left}px`;
-    bar.style.width = `${width}px`;
+    activeBar.classList.add("bulk-following");
+    activeBar.style.left = `${Math.max(mainRect.left + 18, 0)}px`;
+    activeBar.style.width = `${Math.max(mainRect.width - 36, 280)}px`;
   }
 
-  function update(){
+  function updateNow(){
+    rafPending = false;
     const bar = getBar();
+
     if (!bar || !inventoryVisible() || selectedCount(bar) < 1){
       release();
       return;
@@ -76,18 +79,26 @@
 
     if (!activeBar){
       const rect = bar.getBoundingClientRect();
-      originalTop = window.scrollY + rect.top;
+      anchorTop = window.scrollY + rect.top;
     }
 
-    if (window.scrollY + 8 >= originalTop){ pin(bar); }
+    if (window.scrollY + 8 >= anchorTop) pin(bar);
     else release();
   }
 
-  window.addEventListener("scroll", update, {passive:true});
-  window.addEventListener("resize", update);
+  function scheduleUpdate(){
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(updateNow);
+  }
 
-  const observer = new MutationObserver(update);
-  observer.observe(document.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:["class","disabled"]});
+  // Only react to actual user/navigation events. The previous implementation
+  // observed nearly every DOM/class mutation across ~2,000 inventory rows,
+  // which could create a feedback loop and freeze Chrome while clicking/scrolling.
+  window.addEventListener("scroll", scheduleUpdate, {passive:true});
+  window.addEventListener("resize", scheduleUpdate, {passive:true});
+  document.addEventListener("click", () => setTimeout(scheduleUpdate, 0), true);
+  document.addEventListener("change", () => setTimeout(scheduleUpdate, 0), true);
 
-  setTimeout(update, 0);
+  setTimeout(scheduleUpdate, 0);
 })();
