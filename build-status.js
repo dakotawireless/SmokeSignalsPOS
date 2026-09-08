@@ -1,12 +1,10 @@
 (() => {
   "use strict";
 
-  const CURRENT_BUILD = "0.1.12";
+  const CURRENT_BUILD = "0.1.13";
   const cartLogo = document.querySelector('.cart-logo');
   if (!cartLogo) return;
 
-  // Remove every older/duplicate build-status control before creating the one
-  // authoritative indicator for this build.
   cartLogo.querySelectorAll('#buildStatusBar,.cart-build-status,.build-sync-bar').forEach(el => el.remove());
 
   const bar = document.createElement('div');
