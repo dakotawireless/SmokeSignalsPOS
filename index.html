@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smoke Signals POS</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=0.1.11">
   <script>
     try {
       if (sessionStorage.getItem("sspos_return_inventory") === "1") {
@@ -42,15 +42,9 @@
 
       <div class="user-card">
         <div class="avatar">O</div>
-        <div>
-          <strong>Owner</strong>
-          <span>Administrator</span>
-        </div>
+        <div><strong>Owner</strong><span>Administrator</span></div>
       </div>
-      <div class="clock">
-        <strong id="clockTime">--:--</strong>
-        <span id="clockDate">--</span>
-      </div>
+      <div class="clock"><strong id="clockTime">--:--</strong><span id="clockDate">--</span></div>
     </aside>
 
     <main class="main">
@@ -62,97 +56,56 @@
         </div>
 
         <div class="section-head">
-          <div>
-            <h2>QUICK PICKS</h2>
-            <p>Choose up to 12 products from Inventory to keep them here.</p>
-          </div>
+          <div><h2>QUICK PICKS</h2><p>Choose up to 12 products from Inventory to keep them here.</p></div>
           <span id="quickPickCount" class="badge">0 / 12</span>
         </div>
         <div id="quickPickGrid" class="product-grid"></div>
 
-        <div class="section-head">
-          <div>
-            <h2>CATEGORIES</h2>
-            <p>Tap a category to browse products.</p>
-          </div>
-        </div>
+        <div class="section-head"><div><h2>CATEGORIES</h2><p>Tap a category to browse products.</p></div></div>
         <div id="categoryGrid" class="category-grid"></div>
 
         <section id="categoryResults" class="category-results hidden">
-          <div class="section-head">
-            <h2 id="categoryTitle">PRODUCTS</h2>
-            <button id="closeCategoryBtn" class="link-btn" type="button">Close</button>
-          </div>
+          <div class="section-head"><h2 id="categoryTitle">PRODUCTS</h2><button id="closeCategoryBtn" class="link-btn" type="button">Close</button></div>
           <div id="categoryProductGrid" class="product-grid"></div>
         </section>
       </section>
 
       <section id="inventoryView" class="view hidden">
         <div class="inventory-toolbar">
-          <div>
-            <h1>Inventory</h1>
-            <p id="inventorySummary">Products imported from your current POS. Stock counts are set to 0 until rollout count.</p>
-          </div>
+          <div><h1>Inventory</h1><p id="inventorySummary">Products imported from your current POS. Stock counts are set to 0 until rollout count.</p></div>
           <button id="addProductBtn" class="primary-btn" type="button">+ Add New Product</button>
         </div>
 
         <div class="inventory-filters">
           <input id="inventorySearch" type="search" placeholder="Search product, barcode, category, supplier...">
-          <select id="inventoryCategoryFilter">
-            <option value="">All categories</option>
-          </select>
-          <label class="check-row">
-            <input id="quickPickOnly" type="checkbox">
-            <span>Home screen items only</span>
-          </label>
+          <select id="inventoryCategoryFilter"><option value="">All categories</option></select>
+          <label class="check-row"><input id="quickPickOnly" type="checkbox"><span>Home screen items only</span></label>
         </div>
 
         <div class="inventory-table-wrap">
           <table class="inventory-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Supplier</th>
-                <th>Cost</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Home</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Product</th><th>Category</th><th>Supplier</th><th>Cost</th><th>Price</th><th>Stock</th><th>Home</th></tr></thead>
             <tbody id="inventoryTableBody"></tbody>
           </table>
         </div>
       </section>
 
       <section id="placeholderView" class="view hidden">
-        <div class="placeholder-card">
-          <h1 id="placeholderTitle">Module</h1>
-          <p>This module is reserved for the next development batch.</p>
-        </div>
+        <div class="placeholder-card"><h1 id="placeholderTitle">Module</h1><p>This module is reserved for the next development batch.</p></div>
       </section>
     </main>
 
     <aside class="cart-panel">
-      <div class="cart-logo">
-        <img src="assets/smoke-signals-words-logo.png" alt="Smoke Signals">
-      </div>
+      <div class="cart-logo"><img src="assets/smoke-signals-words-logo.png" alt="Smoke Signals"></div>
 
       <div class="customer-block">
-        <div class="customer-search-row">
-          <input id="customerSearch" type="search" placeholder="Customer name, phone, or email">
-          <button id="newCustomerBtn" class="small-btn" type="button">+ New</button>
-        </div>
+        <div class="customer-search-row"><input id="customerSearch" type="search" placeholder="Customer name, phone, or email"><button id="newCustomerBtn" class="small-btn" type="button">+ New</button></div>
         <div id="customerResults" class="customer-results hidden"></div>
         <div id="selectedCustomer" class="selected-customer hidden"></div>
       </div>
 
-      <div class="cart-columns">
-        <span>Item</span><span>Qty</span><span>Total</span><span></span>
-      </div>
-
+      <div class="cart-columns"><span>Item</span><span>Qty</span><span>Total</span><span></span></div>
       <div id="cartLines" class="cart-lines"></div>
-
       <button id="saleNoteBtn" class="ghost-btn small" type="button">+ Add Note</button>
 
       <div class="totals">
@@ -162,11 +115,7 @@
         <div class="grand-total"><span>TOTAL</span><strong id="totalValue">$0.00</strong></div>
       </div>
 
-      <div class="pay-grid">
-        <button id="cashBtn" class="pay-btn cash" type="button">💵 CASH</button>
-        <button id="cardBtn" class="pay-btn card" type="button">▣ CARD</button>
-      </div>
-
+      <div class="pay-grid"><button id="cashBtn" class="pay-btn cash" type="button">💵 CASH</button><button id="cardBtn" class="pay-btn card" type="button">▣ CARD</button></div>
       <div class="cart-actions">
         <button id="discountBtn" class="action-btn" type="button">🏷️ Discount</button>
         <button id="holdSaleBtn" class="action-btn" type="button">⏸ Hold Sale</button>
@@ -176,19 +125,18 @@
     </aside>
   </div>
 
-  <div id="modalBackdrop" class="modal-backdrop hidden">
-    <section id="modalCard" class="modal-card" role="dialog" aria-modal="true"></section>
-  </div>
-
+  <div id="modalBackdrop" class="modal-backdrop hidden"><section id="modalCard" class="modal-card" role="dialog" aria-modal="true"></section></div>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script src="data/products.js"></script>
-  <script src="app.js"></script>
-  <script src="stability-fixes.js"></script>
-  <script src="enhancements.js"></script>
-  <script src="quickpick-sort.js"></script>
-  <script src="bulk-selection-fix.js"></script>
-  <script src="inventory-ui-fix.js"></script>
+  <script src="data/products.js?v=0.1.11"></script>
+  <script src="app.js?v=0.1.11"></script>
+  <script src="stability-fixes.js?v=0.1.11"></script>
+  <script src="inventory-selection-v3.js?v=0.1.11"></script>
+  <script src="enhancements.js?v=0.1.11"></script>
+  <script src="quickpick-sort.js?v=0.1.11"></script>
+  <script src="bulk-selection-fix.js?v=0.1.11"></script>
+  <script src="inventory-ui-fix.js?v=0.1.11"></script>
+  <script src="build-status.js?v=0.1.11"></script>
   <script>
     if (document.documentElement.classList.contains("returning-inventory")) {
       setTimeout(() => document.documentElement.classList.remove("returning-inventory"), 100);
