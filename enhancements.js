@@ -2,6 +2,7 @@
   "use strict";
 
   const PRODUCT_STORAGE_KEY = "sspos_products_v2";
+  const MAX_QUICK_PICKS = 12;
   const searchInput = document.getElementById("productSearch");
   const searchbar = document.querySelector(".searchbar");
   const toast = document.getElementById("toast");
@@ -17,6 +18,14 @@
     .product-search-result span{font-size:15px;font-weight:850;line-height:1.2}
     .product-search-result strong{white-space:nowrap;font-size:14px}
     .product-search-empty{padding:13px;color:var(--muted);font-size:13px}
+    .inventory-table .barcode-col{min-width:150px;max-width:240px}
+    .inventory-table .barcode-list{font-size:11px;line-height:1.3;word-break:break-word}
+    .inventory-table .barcode-list span{display:block;white-space:nowrap}
+    .inventory-table .home-cell{text-align:center}
+    .inventory-table .home-checkbox{width:18px;height:18px;accent-color:var(--green);cursor:pointer}
+    .inventory-table .delete-cell{text-align:center;width:42px}
+    .inventory-table .delete-item-btn{border:0;background:transparent;color:#b72b2b;font-size:20px;line-height:1;padding:4px 7px;border-radius:6px}
+    .inventory-table .delete-item-btn:hover{background:#fff0f0}
   `;
   document.head.appendChild(style);
 
@@ -28,6 +37,9 @@
       if (raw) return JSON.parse(raw);
     }catch{}
     return Array.isArray(window.SMOKE_SIGNALS_IMPORTED_PRODUCTS) ? window.SMOKE_SIGNALS_IMPORTED_PRODUCTS : [];
+  }
+  function saveProducts(list){
+    localStorage.setItem(PRODUCT_STORAGE_KEY, JSON.stringify(list));
   }
   function showMessage(message){
     if (!toast) return;
@@ -196,6 +208,137 @@
     clearTimeout(scanner.resetTimer);
     scanner.resetTimer = setTimeout(resetScanner, 220);
   }, true);
+
+  const inventoryTable = document.querySelector(".inventory-table");
+  const inventoryBody = document.getElementById("inventoryTableBody");
+
+  function ensureInventoryHeaders(){
+    if (!inventoryTable) return;
+    const row = inventoryTable.querySelector("thead tr");
+    if (!row) return;
+    const headers = [...row.children];
+    if (!row.querySelector('[data-extra-header="barcode"]')){
+      const barcodeTh = document.createElement("th");
+      barcodeTh.textContent = "Barcode(s)";
+      barcodeTh.dataset.extraHeader = "barcode";
+      const costTh = headers.find(th => th.textContent.trim().toLowerCase() === "cost");
+      row.insertBefore(barcodeTh, costTh || null);
+    }
+    if (!row.querySelector('[data-extra-header="delete"]')){
+      const deleteTh = document.createElement("th");
+      deleteTh.textContent = "";
+      deleteTh.dataset.extraHeader = "delete";
+      row.appendChild(deleteTh);
+    }
+  }
+
+  function enhanceInventoryRows(){
+    if (!inventoryBody) return;
+    ensureInventoryHeaders();
+    const list = products();
+    const byId = new Map(list.map(p => [String(p.id), p]));
+
+    inventoryBody.querySelectorAll("tr[data-edit-product]").forEach(row => {
+      const id = String(row.dataset.editProduct);
+      const p = byId.get(id);
+      if (!p) return;
+
+      if (!row.querySelector('[data-extra-cell="barcode"]')){
+        const td = document.createElement("td");
+        td.dataset.extraCell = "barcode";
+        td.className = "barcode-col";
+        td.innerHTML = (p.barcodes || []).length
+          ? `<div class="barcode-list">${p.barcodes.map(b=>`<span>${esc(b)}</span>`).join("")}</div>`
+          : `<span class="muted">No barcode</span>`;
+        const originalCostCell = row.children[3];
+        row.insertBefore(td, originalCostCell || null);
+      }
+
+      const cells = row.children;
+      const homeCell = cells[cells.length - 1];
+      if (homeCell && !homeCell.querySelector(".home-checkbox") && !homeCell.dataset.extraCell){
+        homeCell.classList.add("home-cell");
+        homeCell.innerHTML = `<input class="home-checkbox" type="checkbox" ${p.quickPick ? "checked" : ""} aria-label="Add ${esc(p.name)} to home screen">`;
+      }
+
+      if (!row.querySelector('[data-extra-cell="delete"]')){
+        const del = document.createElement("td");
+        del.dataset.extraCell = "delete";
+        del.className = "delete-cell";
+        del.innerHTML = `<button class="delete-item-btn" type="button" aria-label="Delete ${esc(p.name)}" title="Delete item">×</button>`;
+        row.appendChild(del);
+      }
+    });
+  }
+
+  function toggleQuickPick(row, checked){
+    const id = String(row.dataset.editProduct);
+    const list = products();
+    const p = list.find(x => String(x.id) === id);
+    if (!p) return;
+
+    const currentCount = list.filter(x => x.quickPick).length;
+    if (checked && !p.quickPick && currentCount >= MAX_QUICK_PICKS){
+      const box = row.querySelector(".home-checkbox");
+      if (box) box.checked = false;
+      showMessage("Home screen is full. Remove another item before adding a new one.");
+      return;
+    }
+
+    row.click();
+    const modalBox = document.getElementById("pfQuickPick");
+    const form = document.getElementById("productForm");
+    if (modalBox && form){
+      modalBox.checked = checked;
+      if (typeof form.requestSubmit === "function") form.requestSubmit();
+      else form.dispatchEvent(new Event("submit", {bubbles:true,cancelable:true}));
+      showMessage(checked ? `${p.name} added to Home Screen.` : `${p.name} removed from Home Screen.`);
+    }
+  }
+
+  function deleteInventoryItem(row){
+    const id = String(row.dataset.editProduct);
+    const list = products();
+    const p = list.find(x => String(x.id) === id);
+    if (!p) return;
+    if (!window.confirm(`Delete "${p.name}" from inventory?`)) return;
+
+    const next = list.filter(x => String(x.id) !== id);
+    saveProducts(next);
+    sessionStorage.setItem("sspos_return_inventory", "1");
+    location.reload();
+  }
+
+  inventoryBody?.addEventListener("click", e => {
+    const checkbox = e.target.closest(".home-checkbox");
+    if (checkbox){
+      e.preventDefault();
+      e.stopPropagation();
+      const row = checkbox.closest("tr[data-edit-product]");
+      toggleQuickPick(row, checkbox.checked);
+      return;
+    }
+    const del = e.target.closest(".delete-item-btn");
+    if (del){
+      e.preventDefault();
+      e.stopPropagation();
+      const row = del.closest("tr[data-edit-product]");
+      deleteInventoryItem(row);
+    }
+  }, true);
+
+  if (inventoryBody){
+    const observer = new MutationObserver(()=>enhanceInventoryRows());
+    observer.observe(inventoryBody, {childList:true});
+    enhanceInventoryRows();
+  }
+
+  if (sessionStorage.getItem("sspos_return_inventory") === "1"){
+    sessionStorage.removeItem("sspos_return_inventory");
+    setTimeout(()=>{
+      document.querySelector('.nav-btn[data-view="inventory"]')?.click();
+    }, 0);
+  }
 
   setTimeout(()=>searchInput.focus(), 0);
 })();
