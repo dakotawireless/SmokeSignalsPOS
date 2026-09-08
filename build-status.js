@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const CURRENT_BUILD = "0.1.17";
+  const CURRENT_BUILD = "0.1.18";
   const cartLogo = document.querySelector('.cart-logo');
   if (!cartLogo) return;
 
@@ -67,11 +67,4 @@
 
   syncBtn.addEventListener("click", ()=>checkLatestBuild(true));
   checkLatestBuild(false);
-
-  if (!document.querySelector('script[data-bulk-follow]')) {
-    const s = document.createElement('script');
-    s.src = `bulk-bar-follow.js?v=${CURRENT_BUILD}`;
-    s.dataset.bulkFollow = 'true';
-    document.body.appendChild(s);
-  }
 })();
