@@ -4,9 +4,22 @@
   const PRODUCT_STORAGE_KEY = "sspos_products_v2";
   const inventoryBody = document.getElementById("inventoryTableBody");
   const inventoryTable = document.querySelector(".inventory-table");
-  if (!inventoryBody || !inventoryTable) return;
+  const main = document.querySelector(".main");
+  if (!inventoryBody || !inventoryTable || !main) return;
 
   const selected = new Set();
+
+  const style = document.createElement("style");
+  style.textContent = `
+    #bulkInventoryBarFixed.bulk-fixed-active {
+      position: fixed !important;
+      top: 8px !important;
+      z-index: 95 !important;
+      margin: 0 !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,.16) !important;
+    }
+  `;
+  document.head.appendChild(style);
 
   function products(){
     try{
@@ -70,6 +83,21 @@
     return bar;
   }
 
+  function positionBar(){
+    const bar = ensureBar();
+    if (!bar) return;
+    if (selected.size > 0) {
+      const rect = main.getBoundingClientRect();
+      bar.classList.add('bulk-fixed-active');
+      bar.style.left = `${Math.max(rect.left + 18, 8)}px`;
+      bar.style.width = `${Math.max(rect.width - 36, 280)}px`;
+    } else {
+      bar.classList.remove('bulk-fixed-active');
+      bar.style.left = '';
+      bar.style.width = '';
+    }
+  }
+
   function refreshBar(){
     ensureBar();
     const count = selected.size;
@@ -87,6 +115,7 @@
       all.checked = rows.length > 0 && checked === rows.length;
       all.indeterminate = checked > 0 && checked < rows.length;
     }
+    positionBar();
   }
 
   function syncRowCheckboxes(){
@@ -96,10 +125,6 @@
     });
   }
 
-  // Handle row selection ourselves. The older inventory code also listens for
-  // these clicks, so relying on the browser's later default checkbox toggle was
-  // allowing the old handler to undo the visual state. Toggle immediately here
-  // and stop the older handler from ever seeing the event.
   inventoryBody.addEventListener('click', e => {
     const box = e.target.closest('.row-select');
     if (!box) return;
@@ -119,8 +144,6 @@
     refreshBar();
   }, true);
 
-  // Deterministic Select All: manually set every visible checkbox and selection
-  // record instead of relying on the native default action/older listeners.
   inventoryTable.addEventListener('click', e => {
     const all = e.target.closest('.select-all');
     if (!all) return;
@@ -149,6 +172,8 @@
     refreshBar();
   });
   observer.observe(inventoryBody, { childList: true });
+
+  window.addEventListener('resize', positionBar, {passive:true});
 
   ensureBar();
   syncRowCheckboxes();
