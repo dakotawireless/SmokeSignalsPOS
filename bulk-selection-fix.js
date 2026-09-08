@@ -28,7 +28,6 @@
     let bar = document.getElementById('bulkInventoryBarFixed');
     if (bar) return bar;
 
-    // Hide the previous bulk bar so only the corrected one is shown.
     const oldBar = document.getElementById('bulkInventoryBar');
     if (oldBar) oldBar.style.display = 'none';
 
@@ -97,40 +96,52 @@
     });
   }
 
-  // Capture before the older delegated handler. We stop that handler and let
-  // the native checkbox default action toggle visually, then update selection.
+  // Handle row selection ourselves. The older inventory code also listens for
+  // these clicks, so relying on the browser's later default checkbox toggle was
+  // allowing the old handler to undo the visual state. Toggle immediately here
+  // and stop the older handler from ever seeing the event.
   inventoryBody.addEventListener('click', e => {
     const box = e.target.closest('.row-select');
     if (!box) return;
+
+    e.preventDefault();
     e.stopImmediatePropagation();
 
     const row = box.closest('tr[data-edit-product]');
     if (!row) return;
     const id = String(row.dataset.editProduct);
+    const nextChecked = !selected.has(id);
 
-    // The browser applies the checkbox's default toggle after the click event.
-    setTimeout(() => {
-      if (box.checked) selected.add(id);
-      else selected.delete(id);
-      refreshBar();
-    }, 0);
+    if (nextChecked) selected.add(id);
+    else selected.delete(id);
+
+    box.checked = nextChecked;
+    refreshBar();
   }, true);
 
-  // Correct Select All as well, and block the older listener from interfering.
+  // Deterministic Select All: manually set every visible checkbox and selection
+  // record instead of relying on the native default action/older listeners.
   inventoryTable.addEventListener('click', e => {
     const all = e.target.closest('.select-all');
     if (!all) return;
+
+    e.preventDefault();
     e.stopImmediatePropagation();
 
-    setTimeout(() => {
-      const checked = all.checked;
-      visibleRows().forEach(row => {
-        const id = String(row.dataset.editProduct);
-        if (checked) selected.add(id); else selected.delete(id);
-      });
-      syncRowCheckboxes();
-      refreshBar();
-    }, 0);
+    const rows = visibleRows();
+    const allVisibleSelected = rows.length > 0 && rows.every(r => selected.has(String(r.dataset.editProduct)));
+    const nextChecked = !allVisibleSelected;
+
+    rows.forEach(row => {
+      const id = String(row.dataset.editProduct);
+      if (nextChecked) selected.add(id); else selected.delete(id);
+      const box = row.querySelector('.row-select');
+      if (box) box.checked = nextChecked;
+    });
+
+    all.checked = nextChecked;
+    all.indeterminate = false;
+    refreshBar();
   }, true);
 
   const observer = new MutationObserver(() => {
