@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const CURRENT_BUILD = "0.1.14";
+  const CURRENT_BUILD = "0.1.15";
   const cartLogo = document.querySelector('.cart-logo');
   if (!cartLogo) return;
 
@@ -67,4 +67,14 @@
 
   syncBtn.addEventListener("click", ()=>checkLatestBuild(true));
   checkLatestBuild(false);
+
+  // Load the bulk-action follower with a build-specific URL so Chrome cannot
+  // reuse an older cached copy. This keeps Archive/Delete visible while the
+  // browser window itself scrolls, which is the actual scroll container here.
+  if (!document.querySelector('script[data-bulk-follow]')) {
+    const s = document.createElement('script');
+    s.src = `bulk-bar-follow.js?v=${CURRENT_BUILD}`;
+    s.dataset.bulkFollow = 'true';
+    document.body.appendChild(s);
+  }
 })();
