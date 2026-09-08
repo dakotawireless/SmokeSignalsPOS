@@ -6,10 +6,41 @@
   const inventoryTable = document.querySelector(".inventory-table");
   if (!inventoryBody || !inventoryTable) return;
 
+  const selected = new Set();
+  const bar = document.createElement("div");
+  bar.id = "bulkInventoryBar";
+  bar.className = "bulk-inventory-bar";
+  bar.setAttribute("role", "region");
+  bar.setAttribute("aria-label", "Inventory bulk actions");
+  bar.innerHTML = '<span class="bulk-count" id="bulkInventoryCount" aria-live="polite">0 selected</span><button class="bulk-archive-btn" id="bulkArchiveBtn" type="button" disabled>Archive Selected</button><button class="bulk-delete-btn" id="bulkDeleteBtn" type="button" disabled>Delete Selected</button>';
+  const slot = document.createElement("div");
+  slot.className = "inventory-bulk-slot";
+  inventoryTable.closest(".inventory-table-wrap").before(slot);
+  slot.appendChild(bar);
+
+  // One real toolbar, positioned against the viewport. The slot reserves its
+  // normal height so selecting a row cannot move the table under the pointer.
+  const main = document.querySelector(".main");
+  function sizeToolbar(){
+    const rect = slot.getBoundingClientRect();
+    bar.style.setProperty("--bulk-left", rect.left + "px");
+    bar.style.setProperty("--bulk-width", rect.width + "px");
+    slot.style.minHeight = bar.getBoundingClientRect().height + "px";
+  }
+  new ResizeObserver(sizeToolbar).observe(main);
+  new ResizeObserver(sizeToolbar).observe(bar);
+  window.addEventListener("resize", sizeToolbar, {passive:true});
+
   try { sessionStorage.removeItem("sspos_return_inventory"); } catch (_) {}
 
   const style = document.createElement("style");
   style.textContent = `
+    .inventory-bulk-slot { margin:10px 0; }
+    #bulkInventoryBar { margin:0; flex-wrap:wrap; }
+    #bulkInventoryBar.has-selection {
+      position:fixed; top:8px; left:var(--bulk-left); width:var(--bulk-width);
+      z-index:25; box-shadow:0 6px 18px rgba(0,0,0,.16);
+    }
     .inventory-table .row-select,
     .inventory-table .select-all {
       appearance:none !important;
@@ -68,12 +99,14 @@
     const rows = visibleRows();
     const checkedRows = rows.filter(row => row.querySelector('.row-select')?.checked);
     const count = checkedRows.length;
+    bar.classList.toggle("has-selection", count > 0);
+    sizeToolbar();
 
-    ["bulkInventoryCount","bulkInventoryCountFixed"].forEach(id=>{
+    ["bulkInventoryCount"].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.textContent = `${count} selected`;
     });
-    ["bulkArchiveBtn","bulkDeleteBtn","bulkArchiveBtnFixed","bulkDeleteBtnFixed"].forEach(id=>{
+    ["bulkArchiveBtn","bulkDeleteBtn"].forEach(id=>{
       const el = document.getElementById(id);
       if(el) el.disabled = count === 0;
     });
@@ -101,6 +134,7 @@
   }
 
   function removeProductFromVisibleUI(id){
+    selected.delete(String(id));
     inventoryBody.querySelector(`tr[data-edit-product="${CSS.escape(String(id))}"]`)?.remove();
     document.querySelectorAll(`[data-product-id="${CSS.escape(String(id))}"]`).forEach(el=>el.remove());
     refreshCounts();
@@ -108,6 +142,7 @@
   }
 
   function archiveProductInVisibleUI(id){
+    selected.delete(String(id));
     const row = inventoryBody.querySelector(`tr[data-edit-product="${CSS.escape(String(id))}"]`);
     if(row) row.style.display = "none";
     document.querySelectorAll(`[data-product-id="${CSS.escape(String(id))}"]`).forEach(el=>el.remove());
@@ -121,33 +156,32 @@
       .map(row => String(row.dataset.editProduct));
   }
 
-  // This handler runs on WINDOW during capture, before the older inventory handlers
-  // attached lower in the DOM tree can undo checkbox state or trigger a page reload.
+  // Allow native checkbox activation (including Space) and handle its change
+  // exactly once. Do not cancel the click: cancellation restores the old value.
+  inventoryTable.addEventListener("click", e => {
+    if (e.target.closest('.row-select,.select-all')) e.stopPropagation();
+  }, true);
+  inventoryTable.addEventListener("change", e => {
+    const box = e.target;
+    if (box.matches('.row-select')) {
+      const id = String(box.closest('tr[data-edit-product]').dataset.editProduct);
+      if (box.checked) selected.add(id); else selected.delete(id);
+      paintCheckbox(box, box.checked);
+    } else if (box.matches('.select-all')) {
+      const checked = box.checked;
+      visibleRows().forEach(row => {
+        const id = String(row.dataset.editProduct);
+        if (checked) selected.add(id); else selected.delete(id);
+        paintCheckbox(row.querySelector('.row-select'), checked);
+      });
+    } else return;
+    e.stopPropagation();
+    updateSelectionUI();
+  });
+
   window.addEventListener("click", e=>{
     const target = e.target;
     if(!(target instanceof Element)) return;
-
-    const rowBox = target.closest('.row-select');
-    if(rowBox){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      paintCheckbox(rowBox, !rowBox.checked);
-      updateSelectionUI();
-      return;
-    }
-
-    const selectAll = target.closest('.select-all');
-    if(selectAll){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const next = !(selectAll.checked && !selectAll.indeterminate);
-      visibleRows().forEach(row => paintCheckbox(row.querySelector('.row-select'), next));
-      selectAll.indeterminate = false;
-      paintCheckbox(selectAll, next);
-      selectAll.dataset.forceIndeterminate = "false";
-      updateSelectionUI();
-      return;
-    }
 
     const singleDelete = target.closest('.delete-item-btn');
     if(singleDelete){
@@ -165,8 +199,8 @@
       return;
     }
 
-    const bulkDelete = target.closest('#bulkDeleteBtn,#bulkDeleteBtnFixed');
-    const bulkArchive = target.closest('#bulkArchiveBtn,#bulkArchiveBtnFixed');
+    const bulkDelete = target.closest('#bulkDeleteBtn');
+    const bulkArchive = target.closest('#bulkArchiveBtn');
     if(bulkDelete || bulkArchive){
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -200,7 +234,7 @@
       if(!p) row.remove();
       else if(p.archived) row.style.display="none";
       const box = row.querySelector('.row-select');
-      if(box) paintCheckbox(box, !!box.checked);
+      if(box) paintCheckbox(box, selected.has(String(row.dataset.editProduct)));
     });
     updateSelectionUI();
   });

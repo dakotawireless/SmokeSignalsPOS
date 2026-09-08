@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const CURRENT_BUILD = "0.1.19";
+  const CURRENT_BUILD = "0.1.20";
   const cartLogo = document.querySelector('.cart-logo');
   if (!cartLogo) return;
 
