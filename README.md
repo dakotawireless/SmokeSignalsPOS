@@ -3,7 +3,7 @@
 Initial working Smoke Signals POS prototype built from the current POS product export.
 
 ## Imported catalog
-- 216 products
+- 1967 products
 - product name
 - category
 - supplier
@@ -38,3 +38,7 @@ Initial working Smoke Signals POS prototype built from the current POS product e
 Open `index.html` in a browser.
 
 The prototype stores edits in browser localStorage, so changes persist on that computer/browser while we continue development.
+
+
+## Current product import
+The original 216-product test import was discarded and replaced with Products.xlsx containing 1967 product records.

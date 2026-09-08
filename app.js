@@ -5,9 +5,9 @@
   const TAX_RATE = 0.0825;
   const MAX_QUICK_PICKS = 12;
   const STORAGE_KEYS = {
-    products: "sspos_products_v1",
+    products: "sspos_products_v2",
     customers: "sspos_customers_v1",
-    movements: "sspos_inventory_movements_v1"
+    movements: "sspos_inventory_movements_v2"
   };
 
   const imported = Array.isArray(window.SMOKE_SIGNALS_IMPORTED_PRODUCTS)
