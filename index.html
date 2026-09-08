@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smoke Signals POS</title>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    try {
+      if (sessionStorage.getItem("sspos_return_inventory") === "1") {
+        document.documentElement.classList.add("returning-inventory");
+      }
+    } catch (_) {}
+  </script>
+  <style>
+    html.returning-inventory #saleView { display:none !important; }
+    html.returning-inventory #inventoryView { display:block !important; }
+    html.returning-inventory .nav-btn[data-view="sale"] { background:transparent !important; }
+    html.returning-inventory .nav-btn[data-view="inventory"] { background:linear-gradient(90deg,#1b6119,#278522) !important; }
+  </style>
 </head>
 <body>
   <div class="app-shell">
@@ -175,5 +188,10 @@
   <script src="enhancements.js"></script>
   <script src="quickpick-sort.js"></script>
   <script src="bulk-selection-fix.js"></script>
+  <script>
+    if (document.documentElement.classList.contains("returning-inventory")) {
+      setTimeout(() => document.documentElement.classList.remove("returning-inventory"), 100);
+    }
+  </script>
 </body>
 </html>
