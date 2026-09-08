@@ -35,7 +35,32 @@
     return [...grid.querySelectorAll(":scope > .product-tile[data-product-id]")];
   }
 
+  let dragged = null;
+  let pointerTile = null;
+  let pointerId = null;
+  let internalMove = false;
+
+  function isDragging(){
+    return !!dragged || !!pointerTile;
+  }
+
+  function clearTargets(){
+    currentTiles().forEach(t => t.classList.remove("quickpick-drop-target"));
+  }
+
+  function persistDomOrder(){
+    saveOrder(currentTiles().map(tileId));
+  }
+
+  function moveTile(tile, beforeNode){
+    internalMove = true;
+    grid.insertBefore(tile, beforeNode || null);
+    queueMicrotask(() => { internalMove = false; });
+  }
+
   function applySavedOrder(){
+    if (isDragging()) return;
+
     const tiles = currentTiles();
     if (!tiles.length) return;
 
@@ -58,19 +83,11 @@
       }
     });
 
+    internalMove = true;
     ordered.forEach(tile => grid.appendChild(tile));
+    queueMicrotask(() => { internalMove = false; });
     saveOrder(ordered.map(tileId));
     makeTilesDraggable();
-  }
-
-  let dragged = null;
-
-  function clearTargets(){
-    currentTiles().forEach(t => t.classList.remove("quickpick-drop-target"));
-  }
-
-  function persistDomOrder(){
-    saveOrder(currentTiles().map(tileId));
   }
 
   function makeTilesDraggable(){
@@ -104,14 +121,13 @@
         const rect = tile.getBoundingClientRect();
         const midpointX = rect.left + rect.width / 2;
         const midpointY = rect.top + rect.height / 2;
-        const sameRow = Math.abs((dragged.getBoundingClientRect().top + dragged.getBoundingClientRect().height / 2) - midpointY) < rect.height * .75;
+        const draggedRect = dragged.getBoundingClientRect();
+        const sameRow = Math.abs((draggedRect.top + draggedRect.height / 2) - midpointY) < rect.height * .75;
 
         if (sameRow){
-          if (e.clientX < midpointX) grid.insertBefore(dragged, tile);
-          else grid.insertBefore(dragged, tile.nextSibling);
+          moveTile(dragged, e.clientX < midpointX ? tile : tile.nextSibling);
         } else {
-          if (e.clientY < midpointY) grid.insertBefore(dragged, tile);
-          else grid.insertBefore(dragged, tile.nextSibling);
+          moveTile(dragged, e.clientY < midpointY ? tile : tile.nextSibling);
         }
       });
 
@@ -123,10 +139,6 @@
       });
     });
   }
-
-  // Touch/pointer drag support for tablets and touchscreens.
-  let pointerTile = null;
-  let pointerId = null;
 
   grid.addEventListener("pointerdown", e => {
     const tile = e.target.closest(".product-tile[data-product-id]");
@@ -142,11 +154,14 @@
     e.preventDefault();
     const el = document.elementFromPoint(e.clientX, e.clientY)?.closest(".product-tile[data-product-id]");
     if (!el || el === pointerTile || !grid.contains(el)) return;
+
     clearTargets();
     el.classList.add("quickpick-drop-target");
     const rect = el.getBoundingClientRect();
-    const before = e.clientY < rect.top + rect.height / 2 || (Math.abs(e.clientY - (rect.top + rect.height / 2)) < rect.height * .35 && e.clientX < rect.left + rect.width / 2);
-    grid.insertBefore(pointerTile, before ? el : el.nextSibling);
+    const centerY = rect.top + rect.height / 2;
+    const centerX = rect.left + rect.width / 2;
+    const before = e.clientY < centerY || (Math.abs(e.clientY - centerY) < rect.height * .35 && e.clientX < centerX);
+    moveTile(pointerTile, before ? el : el.nextSibling);
   }, {passive:false});
 
   function endPointerDrag(e){
@@ -162,8 +177,11 @@
   grid.addEventListener("pointercancel", endPointerDrag);
 
   const observer = new MutationObserver(() => {
+    if (internalMove || isDragging()) return;
     clearTimeout(observer.timer);
-    observer.timer = setTimeout(applySavedOrder, 0);
+    observer.timer = setTimeout(() => {
+      if (!internalMove && !isDragging()) applySavedOrder();
+    }, 20);
   });
   observer.observe(grid, {childList:true});
 
