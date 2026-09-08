@@ -38,6 +38,14 @@
       border-color:#267b22 !important;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath stroke='white' stroke-width='3' stroke-linecap='round' d='M4 10h12'/%3E%3C/svg%3E") !important;
     }
+    #bulkInventoryBar,
+    #bulkInventoryBarFixed {
+      position:sticky !important;
+      top:0 !important;
+      z-index:25 !important;
+      background:#fff !important;
+      box-shadow:0 6px 18px rgba(0,0,0,.08) !important;
+    }
   `;
   document.head.appendChild(style);
 
