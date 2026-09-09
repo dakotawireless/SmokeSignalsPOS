@@ -1,170 +1,21 @@
 (() => {
   "use strict";
-
-  const TX_KEY = "sspos_transactions_v1";
-  const BUILD = "0.1.22";
-  const $ = id => document.getElementById(id);
-  const money = n => `$${Number(n || 0).toFixed(2)}`;
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-
-  function loadTransactions(){
-    try { return JSON.parse(localStorage.getItem(TX_KEY) || "[]"); }
-    catch { return []; }
-  }
-
-  let lastFirstId = String(loadTransactions()[0]?.id || "");
-
-  function closeReceiptModal(){
-    $('modalBackdrop')?.classList.add('hidden');
-    if ($('modalCard')) $('modalCard').innerHTML = '';
-  }
-
-  function formatDate(iso){
-    const d = new Date(iso);
-    return `${d.toLocaleDateString([], {month:"numeric",day:"numeric",year:"numeric"})} ${d.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`;
-  }
-
+  const TX_KEY="sspos_transactions_v1", BUILD="0.1.23", $=id=>document.getElementById(id), money=n=>`$${Number(n||0).toFixed(2)}`, esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  function loadTransactions(){try{return JSON.parse(localStorage.getItem(TX_KEY)||"[]")}catch{return[]}}
+  let lastFirstId=String(loadTransactions()[0]?.id||"");
+  function closeReceiptModal(){$('modalBackdrop')?.classList.add('hidden');if($('modalCard'))$('modalCard').innerHTML=''}
+  function dateParts(iso){const d=new Date(iso);return{date:d.toLocaleDateString([],{month:"2-digit",day:"2-digit",year:"numeric"}),time:d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}}
   function receiptHtml(tx){
-    const itemRows = (tx.items || []).map(item => `
-      <div class="item">
-        <div class="item-name">${esc(item.name)}</div>
-        <div class="item-line"><span>${Number(item.qty || 0)} x ${money(item.unitPrice)}</span><strong>${money(item.lineTotal)}</strong></div>
-        ${item.adjustment ? `<div class="adjustment">${esc(item.adjustment)}</div>` : ""}
-      </div>`).join("");
-
-    const paymentRows = (tx.payments || []).map(p => {
-      if (p.type === "Cash") {
-        return `
-          <div class="row"><span>Cash</span><strong>${money(p.amount)}</strong></div>
-          <div class="subrow"><span>Cash Received</span><span>${money(p.cashReceived)}</span></div>
-          <div class="subrow"><span>Change</span><span>${money(p.changeGiven)}</span></div>`;
-      }
-      return `
-        <div class="row"><span>Card</span><strong>${money(p.amount)}</strong></div>
-        ${p.approvalCode ? `<div class="subrow"><span>Approval</span><span>${esc(p.approvalCode)}</span></div>` : ""}`;
-    }).join("");
-
-    return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${esc(tx.transactionNumber || "Receipt")}</title>
-<style>
-  @page { size: 80mm auto; margin: 0; }
-  html,body{margin:0;padding:0;background:#fff;color:#000}
-  body{width:72mm;margin:0 auto;padding:4mm 0 6mm;font-family:"Courier New",monospace;font-size:11px;line-height:1.28}
-  *{box-sizing:border-box}
-  .center{text-align:center}.store{font-size:19px;font-weight:900;letter-spacing:.5px}.small{font-size:9px}
-  .rule{border-top:1px dashed #000;margin:7px 0}.row,.subrow,.item-line{display:flex;justify-content:space-between;gap:8px}
-  .row{padding:2px 0}.subrow{font-size:9px;padding:1px 0}.item{padding:3px 0}.item-name{font-weight:700;word-break:break-word}.item-line{margin-top:1px}.adjustment{font-size:9px;margin-top:1px}
-  .total{font-size:15px;font-weight:900;padding-top:3px}.footer{margin-top:10px;text-align:center;font-size:10px}
-  @media print{body{width:72mm} }
-</style>
-</head>
-<body>
-  <div class="center store">SMOKE SIGNALS</div>
-  <div class="center">Wolf Point, MT</div>
-  <div class="rule"></div>
-  <div>Transaction: ${esc(tx.transactionNumber || "")}</div>
-  <div>Date: ${esc(formatDate(tx.createdAt))}</div>
-  <div>Employee: ${esc(tx.employee || "Owner")}</div>
-  ${tx.customerName && tx.customerName !== "Walk-in" ? `<div>Customer: ${esc(tx.customerName)}</div>` : ""}
-  <div class="rule"></div>
-  ${itemRows}
-  <div class="rule"></div>
-  <div class="row"><span>Subtotal</span><strong>${money(tx.subtotal)}</strong></div>
-  ${tx.discountAmount ? `<div class="row"><span>${esc(tx.discountLabel || "Discount")}</span><strong>-${money(tx.discountAmount)}</strong></div>` : ""}
-  <div class="row total"><span>TOTAL</span><strong>${money(tx.total)}</strong></div>
-  <div class="rule"></div>
-  ${paymentRows}
-  <div class="rule"></div>
-  <div class="footer">Thank you!</div>
-  <div class="center small">Smoke Signals POS • Build ${BUILD}</div>
-<script>
-  window.addEventListener('load',()=>setTimeout(()=>window.print(),100));
-  window.addEventListener('afterprint',()=>window.close());
-<\/script>
-</body>
-</html>`;
+    const logo=window.SMOKE_SIGNALS_RECEIPT_LOGO||"",dt=dateParts(tx.createdAt);
+    const itemRows=(tx.items||[]).map(i=>`<div class="item-row"><div>${Number(i.qty||0)}</div><div class="desc"><strong>${esc(i.name)}</strong>${i.adjustment?`<small>${esc(i.adjustment)}</small>`:""}</div><div class="num">${money(i.unitPrice)}</div><div class="num">${money(i.lineTotal)}</div></div>`).join("");
+    const paymentRows=(tx.payments||[]).map(p=>p.type==="Cash"?`<div class="pay"><span>Payment Type:</span><strong>Cash</strong></div><div class="pay"><span>Amount Tendered:</span><strong>${money(p.cashReceived)}</strong></div><div class="pay"><span>Cash Applied:</span><strong>${money(p.amount)}</strong></div><div class="pay"><span>Change Due:</span><strong>${money(p.changeGiven)}</strong></div>`:`<div class="pay"><span>Payment Type:</span><strong>Card</strong></div><div class="pay"><span>Card Amount:</span><strong>${money(p.amount)}</strong></div>${p.approvalCode?`<div class="pay small"><span>Approval:</span><strong>${esc(p.approvalCode)}</strong></div>`:""}`).join("");
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tx.transactionNumber||"Receipt")}</title><style>
+@page{size:80mm auto;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}body{width:72mm;margin:0 auto;padding:3mm 0 6mm;font-family:"Courier New",monospace;font-size:10px;line-height:1.22}.center{text-align:center}.logo{display:block;width:58mm;max-height:38mm;object-fit:contain;margin:0 auto 1.5mm}.address{font-size:10px;line-height:1.28}.phone{font-size:11px;margin-top:1mm}.rule{border-top:1px dashed #000;margin:2.5mm 0}.meta{display:grid;grid-template-columns:1fr 1fr;gap:1mm 5mm}.items-head,.item-row{display:grid;grid-template-columns:8mm 1fr 15mm 16mm;gap:1mm;align-items:start}.items-head{font-weight:900;margin-bottom:1mm}.item-row{padding:.7mm 0}.desc{min-width:0;word-break:break-word}.desc small{display:block;font-size:8px;margin-top:.4mm}.num{text-align:right;white-space:nowrap}.totals{margin-left:auto;width:46mm}.total-row,.pay{display:flex;justify-content:space-between;gap:4mm;padding:.6mm 0}.grand{font-size:15px;font-weight:900;border-top:1px solid #000;padding-top:1.2mm;margin-top:.8mm}.pay.small{font-size:9px}.thanks{text-align:center;font-weight:900;font-size:12px;margin-top:2mm}.tagline,.tx-bottom{text-align:center;margin-top:.8mm}.tx-bottom{font-size:9px;margin-top:2mm}@media print{body{width:72mm}}
+</style></head><body>${logo?`<img class="logo" src="${logo}" alt="Smoke Signals">`:`<div class="center" style="font-size:18px;font-weight:900">SMOKE SIGNALS</div>`}<div class="center address">233 US Highway 2 E<br>Wolf Point, Montana</div><div class="center phone">406.204.7300</div><div class="rule"></div><div class="meta"><div>Transaction #: ${esc(tx.transactionNumber||"")}</div><div>Employee: ${esc(tx.employee||"Owner")}</div><div>Date: ${esc(dt.date)}</div><div>Register: 1</div><div>Time: ${esc(dt.time)}</div><div>Customer: ${esc(tx.customerName||"Walk-In")}</div></div><div class="rule"></div><div class="items-head"><div>QTY</div><div>ITEM</div><div class="num">PRICE</div><div class="num">TOTAL</div></div>${itemRows}<div class="rule"></div><div class="totals"><div class="total-row"><span>Subtotal:</span><strong>${money(tx.subtotal)}</strong></div>${tx.discountAmount?`<div class="total-row"><span>${esc(tx.discountLabel||"Discount")}:</span><strong>-${money(tx.discountAmount)}</strong></div>`:""}<div class="total-row grand"><span>TOTAL:</span><strong>${money(tx.total)}</strong></div></div><div class="rule"></div>${paymentRows}<div class="rule"></div><div class="thanks">Thank you for your business!</div><div class="tagline">Stay Elevated.</div><div class="tx-bottom">${esc(tx.transactionNumber||"")}</div><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),150));window.addEventListener('afterprint',()=>window.close());<\/script></body></html>`;
   }
-
-  function printReceipt(tx){
-    const win = window.open('', '_blank', 'width=420,height=720');
-    if (!win) {
-      alert('The receipt window was blocked. Allow pop-ups for this POS and try Print Receipt again.');
-      return false;
-    }
-    win.document.open();
-    win.document.write(receiptHtml(tx));
-    win.document.close();
-    return true;
-  }
-
-  function showReceiptChoice(tx){
-    const card = $('modalCard');
-    const backdrop = $('modalBackdrop');
-    if (!card || !backdrop || !tx) return;
-
-    card.innerHTML = `
-      <div class="modal-head"><h3>Sale Complete</h3></div>
-      <div class="receipt-choice">
-        <div class="receipt-check">✓</div>
-        <strong>${esc(tx.transactionNumber)}</strong>
-        <span>${money(tx.total)} completed successfully.</span>
-        <p>Would you like a receipt?</p>
-        <div class="receipt-choice-actions">
-          <button id="receiptPrintBtn" class="primary-btn" type="button">🧾 Print Receipt</button>
-          <button id="receiptNoBtn" class="secondary-btn" type="button">No Receipt</button>
-        </div>
-      </div>`;
-    backdrop.classList.remove('hidden');
-
-    $('receiptPrintBtn')?.addEventListener('click', () => {
-      if (printReceipt(tx)) closeReceiptModal();
-    });
-    $('receiptNoBtn')?.addEventListener('click', closeReceiptModal);
-  }
-
-  const originalSetItem = Storage.prototype.setItem;
-  Storage.prototype.setItem = function(key, value){
-    originalSetItem.call(this, key, value);
-    if (this !== localStorage || key !== TX_KEY) return;
-    try {
-      const list = JSON.parse(value || "[]");
-      const first = list[0];
-      const firstId = String(first?.id || "");
-      if (first && firstId && firstId !== lastFirstId) {
-        lastFirstId = firstId;
-        setTimeout(() => showReceiptChoice(first), 0);
-      }
-    } catch {}
-  };
-
-  const style = document.createElement('style');
-  style.textContent = `
-    .receipt-choice{text-align:center;padding:10px 4px 2px}.receipt-check{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;background:var(--greenSoft);color:var(--green2);font-size:28px;font-weight:900}.receipt-choice>strong{display:block;font-size:18px}.receipt-choice>span{display:block;color:var(--muted);margin-top:4px}.receipt-choice p{margin:18px 0 10px;font-weight:850}.receipt-choice-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.receipt-choice-actions button{min-height:46px}
-    .receipt-reprint-btn{margin-right:auto}
-    @media(max-width:600px){.receipt-choice-actions{grid-template-columns:1fr}}
-  `;
-  document.head.appendChild(style);
-
-  // Add a reprint option whenever an existing transaction is opened.
-  window.addEventListener('click', e => {
-    const row = e.target.closest?.('.tx-history-row');
-    if (!row) return;
-    const txId = row.dataset.txId;
-    setTimeout(() => {
-      const card = $('modalCard');
-      const actions = card?.querySelector('.modal-actions');
-      if (!actions || actions.querySelector('.receipt-reprint-btn')) return;
-      const tx = loadTransactions().find(t => String(t.id) === String(txId));
-      if (!tx) return;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'secondary-btn receipt-reprint-btn';
-      btn.textContent = '🧾 Print Receipt';
-      btn.addEventListener('click', () => printReceipt(tx));
-      actions.insertBefore(btn, actions.firstChild);
-    }, 0);
-  }, true);
+  function printReceipt(tx){const win=window.open('','_blank','width=420,height=760');if(!win){alert('The receipt window was blocked. Allow pop-ups for this POS and try Print Receipt again.');return false}win.document.open();win.document.write(receiptHtml(tx));win.document.close();return true}
+  function showReceiptChoice(tx){const card=$('modalCard'),backdrop=$('modalBackdrop');if(!card||!backdrop||!tx)return;card.innerHTML=`<div class="modal-head"><h3>Sale Complete</h3></div><div class="receipt-choice"><div class="receipt-check">✓</div><strong>${esc(tx.transactionNumber)}</strong><span>${money(tx.total)} completed successfully.</span><p>Would you like a receipt?</p><div class="receipt-choice-actions"><button id="receiptPrintBtn" class="primary-btn" type="button">🧾 Print Receipt</button><button id="receiptNoBtn" class="secondary-btn" type="button">No Receipt</button></div></div>`;backdrop.classList.remove('hidden');$('receiptPrintBtn')?.addEventListener('click',()=>{if(printReceipt(tx))closeReceiptModal()});$('receiptNoBtn')?.addEventListener('click',closeReceiptModal)}
+  const originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){originalSetItem.call(this,key,value);if(this!==localStorage||key!==TX_KEY)return;try{const list=JSON.parse(value||"[]"),first=list[0],firstId=String(first?.id||"");if(first&&firstId&&firstId!==lastFirstId){lastFirstId=firstId;setTimeout(()=>showReceiptChoice(first),0)}}catch{}};
+  const style=document.createElement('style');style.textContent=`.receipt-choice{text-align:center;padding:10px 4px 2px}.receipt-check{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;background:var(--greenSoft);color:var(--green2);font-size:28px;font-weight:900}.receipt-choice>strong{display:block;font-size:18px}.receipt-choice>span{display:block;color:var(--muted);margin-top:4px}.receipt-choice p{margin:18px 0 10px;font-weight:850}.receipt-choice-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.receipt-choice-actions button{min-height:46px}.receipt-reprint-btn{margin-right:auto}@media(max-width:600px){.receipt-choice-actions{grid-template-columns:1fr}}`;document.head.appendChild(style);
+  window.addEventListener('click',e=>{const row=e.target.closest?.('.tx-history-row');if(!row)return;const txId=row.dataset.txId;setTimeout(()=>{const card=$('modalCard'),actions=card?.querySelector('.modal-actions');if(!actions||actions.querySelector('.receipt-reprint-btn'))return;const tx=loadTransactions().find(t=>String(t.id)===String(txId));if(!tx)return;const btn=document.createElement('button');btn.type='button';btn.className='secondary-btn receipt-reprint-btn';btn.textContent='🧾 Print Receipt';btn.addEventListener('click',()=>printReceipt(tx));actions.insertBefore(btn,actions.firstChild)},0)},true);
 })();
