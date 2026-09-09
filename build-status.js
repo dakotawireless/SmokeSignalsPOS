@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const CURRENT_BUILD = "0.1.23";
+  const CURRENT_BUILD = "0.1.24";
   const cartLogo = document.querySelector('.cart-logo'); if (!cartLogo) return;
   cartLogo.querySelectorAll('#buildStatusBar,.cart-build-status,.build-sync-bar').forEach(el => el.remove());
   const bar=document.createElement('div');bar.className='build-sync-bar';bar.id='buildSyncBar';bar.innerHTML=`<span class="build-version-pill">Build <strong id="buildVersionBadge">v${CURRENT_BUILD}</strong></span><button id="cloudSyncBtn" class="cloud-sync-btn" type="button" data-state="syncing"><span class="sync-dot"></span><span id="cloudSyncText">Checking…</span></button>`;cartLogo.insertBefore(bar,cartLogo.firstChild);
